@@ -110,7 +110,12 @@ impl Plan {
         let replacements = changes.iter().filter(|(delta, _)| *delta != 0).count();
         charge(budget, heap.resource_work()?)?;
         let resource = resources::<P, N>(cells, slab, &changes)?;
-        let mut permit = heap.preflight_resources(resource, ResourcePolicy::from_budget(budget))?;
+        let overlap = changes.iter().try_fold(0, |sum, (_, old)| add(sum, *old))?;
+        let mut permit = heap.preflight_resources_scoped(
+            resource,
+            ResourcePolicy::from_budget(budget),
+            Some(overlap),
+        )?;
         permit.account = Some(account);
         let revision = heap.loans.admission_revision()?;
         charge(budget, 20)?;

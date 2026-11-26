@@ -1,12 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Private bounded graph mechanics; numerical adapters supply no authority through this core.
 
+pub(in crate::loan::graph) mod adapter;
 mod admission;
+#[cfg(test)]
+pub(in crate::loan::graph) mod attempt;
 mod bitmap;
-mod control;
+pub(in crate::loan::graph) mod control;
 mod drive;
 pub(crate) use drive::Capacity;
+#[cfg(test)]
 mod invalidation;
+mod native_wait;
 #[cfg(test)]
 mod tests;
 mod waiting;
@@ -32,6 +37,8 @@ const INVALIDATING: u64 = 1;
 const STOPPED: u64 = 2;
 /// A bounded membership-watermark scan is active.
 const SCANNING: u64 = 4;
+/// A scoped closure owns the shared traversal stack until publication.
+pub(in crate::loan::graph) const SCOPING: u64 = 8;
 /// Waiting membership is independent of ready-index presence.
 const WAITING: u64 = 32;
 /// A fixture dispatch has entered; it is not numerical publication.
@@ -39,17 +46,18 @@ const STARTED: u64 = 64;
 /// A terminal core outcome has been preserved before release.
 const TERMINAL: u64 = 128;
 /// Attempt exhaustion is a terminal fixture outcome with prepaid uses still pending.
+#[cfg(test)]
 const ATTEMPTS: u64 = 256;
 
 /// Admission creates a distinct handle type; O's inspection handles cannot authorize mutation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct Handle {
+pub struct Handle {
     /// Admitted owner identity.
-    owner: u64,
+    pub(in crate::loan::graph) owner: u64,
     /// Occupied node slot.
-    slot: usize,
+    pub(in crate::loan::graph) slot: usize,
     /// Exact occupation generation.
-    generation: u64,
+    pub(in crate::loan::graph) generation: u64,
 }
 
 /// A proposed concrete dependency; its kind never excludes it from cycle checking.
@@ -68,16 +76,32 @@ pub(crate) struct Connection {
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Kind {
     /// Bounded core fixture with no mathematical result authority.
+    #[cfg(test)]
     Fixture,
+    /// A separately admitted adapter owns the native contract and its phase records.
+    Native,
     /// No adapter can silently interpret an unknown contract.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "the private admission policy retains its unsupported-contract refusal control"
+        )
+    )]
     Unsupported,
 }
 /// Typed core failures keep resource stops distinct from topology and ownership refusals.
 #[derive(Debug, thiserror::Error)]
-pub(crate) enum Error {
+pub enum Error {
     /// Existing typed original-account refusal.
     #[error("core native refusal: {0}")]
     Native(LoanError),
+    /// Required evidence could not acquire its prepaid fixed destination.
+    #[error("graph delivery refusal: {0}")]
+    Delivery(super::sink::Error),
+    /// Exact native continuation refusal returned by adapter control.
+    #[error("graph native continuation: {0}")]
+    Adapter(super::adapter::native::Failure),
     /// A semantic or numerical cycle exists in the private proposal.
     #[error("cyclic graph proposal")]
     Cycle,
@@ -105,15 +129,29 @@ pub(crate) enum Admission {
     /// Atomic topology/readiness publication succeeded.
     Admitted(Core),
     /// Inspection readers still protect the unchanged reservation.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "consuming admission returns the unchanged reservation even when the adapter cancels it immediately"
+        )
+    )]
     OwnershipWait(Reservation),
     /// No runnable graph was published; the caller still owns private storage for cancellation.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "consuming admission returns the unchanged reservation even when the adapter cancels it immediately"
+        )
+    )]
     Refused(Error, Reservation),
 }
 /// No public constructor or numerical access is provided by the walk increment.
 #[derive(Debug)]
 pub(crate) struct Core {
     /// O's allocation set stays resident; admission requires its exclusive ownership.
-    reservation: Reservation,
+    pub(in crate::loan::graph) reservation: Reservation,
 }
 impl Core {
     /// Obtain graph authority only after complete admission, never by converting an O handle.
@@ -162,8 +200,12 @@ const fn enter(backing: &mut Backing) -> Result<(), Error> {
 }
 
 /// A failed original Work debit freezes every ordinary entry point, including saved controls.
-const fn record_stop<T>(backing: &mut Backing, result: &Result<T, Error>) {
-    let stopped = matches!(result, Err(Error::Native(LoanError::Budget(fault) | LoanError::Mask(crate::MaskError::Budget(fault)))) if matches!(fault.kind, nrz_bindings::readings::algebra::FaultKind::Exhausted { budget: nrz_bindings::readings::algebra::limits::BudgetKind::Work, .. }));
+pub(in crate::loan::graph) fn record_stop<T>(backing: &mut Backing, result: &Result<T, Error>) {
+    let Err(Error::Native(error) | Error::Delivery(super::sink::Error::Native(error))) = result
+    else {
+        return;
+    };
+    let stopped = super::adapter::native::Failure::loan_work_stopped(error);
     if stopped {
         backing.control.flags |= STOPPED;
     }

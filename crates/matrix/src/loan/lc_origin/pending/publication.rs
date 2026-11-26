@@ -142,6 +142,13 @@ impl<'i, P: Scalar + 'static, const N: usize> LcApplicationEvaluated<'i, P, N> {
     }
 }
 impl<P: Scalar> LcPublishedResult<P> {
+    /// The published law remains available while any original specialized use survives.
+    pub(in crate::loan) fn retained_correspondence(
+        &self,
+    ) -> Option<&Rc<nrz_bindings::LcOmegaCorrespondence>> {
+        self.bundle().retained_correspondence()
+    }
+
     /// Diagnostic locator has no ordinary pin or import authority.
     /// # Panics
     /// Panics only if an internal invariant admits an incomplete published shell.

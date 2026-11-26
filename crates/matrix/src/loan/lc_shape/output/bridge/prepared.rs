@@ -154,23 +154,38 @@ impl<'i, P: Scalar + 'static, const N: usize> LcOmegaOutput<'i, P, N> {
         budget: &mut nrz_bindings::Budget,
     ) -> Result<LcOmegaPrepared<'i, P, N>, LcOmegaPrepareFailure<'i, P, N>> {
         let joined = (|| {
-            let (candidate, plan) = borrowed::prepare_borrowed_on(
-                &self,
-                &*heap,
-                tiles,
-                registry,
-                certificate,
-                identity,
-                budget,
-            )?;
-            capture::join_on(
-                heap,
-                candidate,
-                plan,
-                certificate.map_or(0, Certificate::retained_bytes),
-                identity,
-                budget,
-            )
+            let external = certificate.map_or(0, Certificate::retained_bytes);
+            let baseline = if let Some(gate) = &heap.graph_gate {
+                crate::loan::charge(
+                    budget,
+                    heap.resource_work().map_err(crate::LoanError::from)?,
+                )?;
+                Some(gate.preparation_bytes(
+                    heap.resource_bytes().map_err(crate::LoanError::from)?,
+                    external,
+                )?)
+            } else {
+                None
+            };
+            let (candidate, plan) = graph_scope(budget, baseline, |budget| {
+                borrowed::prepare_borrowed_on(
+                    &self,
+                    &*heap,
+                    tiles,
+                    registry,
+                    certificate,
+                    identity,
+                    budget,
+                )
+            })?;
+            let graph = heap
+                .graph_gate
+                .as_ref()
+                .map(|gate| gate.external_bytes(external))
+                .transpose()?;
+            graph_scope(budget, graph, |budget| {
+                capture::join_on(heap, candidate, plan, external, identity, budget)
+            })
         })();
         match joined {
             Ok((correspondence, receipt)) => Ok(LcOmegaPrepared {
@@ -180,6 +195,21 @@ impl<'i, P: Scalar + 'static, const N: usize> LcOmegaOutput<'i, P, N> {
             }),
             Err(error) => Err(self.refused(error)),
         }
+    }
+}
+
+/// Only an active graph adds its own simultaneous scope; native public calls are unchanged.
+fn graph_scope<T>(
+    budget: &mut nrz_bindings::Budget,
+    bytes: Option<u64>,
+    operation: impl FnOnce(&mut nrz_bindings::Budget) -> Result<T, LcShapeError>,
+) -> Result<T, LcShapeError> {
+    if let Some(bytes) = bytes {
+        budget.with_retained_payload(bytes, crate::loan::AT, |budget| {
+            Ok::<_, crate::LoanError>(operation(budget))
+        })?
+    } else {
+        operation(budget)
     }
 }
 

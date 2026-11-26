@@ -6,7 +6,7 @@ use super::{Backing, Borrowed, ExecutionAccount, LoanError, charge};
 
 /// Worksheet ownership coverage, never an invented zero for an unknown owner.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum Row {
+pub enum Row {
     /// Actual covered retained allocation capacity.
     Covered(usize),
     /// Existing native/bindings owners are outside this storage reservation's projection.
@@ -27,6 +27,18 @@ pub(crate) struct Inventory {
     pub(crate) covered_bytes: usize,
 }
 impl Inventory {
+    /// Preserve the owning worksheet classes while composing covered byte totals.
+    pub(in crate::loan::graph) const fn rows(totals: [usize; 3]) -> [Row; 7] {
+        [
+            Row::Covered(totals[0]),
+            Row::Covered(totals[1]),
+            Row::Covered(totals[2]),
+            Row::OutsideScope,
+            Row::OutsideScope,
+            Row::Deferred,
+            Row::Deferred,
+        ]
+    }
     /// Inspect the supplied live owner set; duplicates never duplicate shared payload.
     pub(crate) fn inspect(
         owners: &[Borrowed<'_>],
@@ -78,15 +90,7 @@ impl Inventory {
             }
         }
         Ok(Self {
-            rows: [
-                Row::Covered(totals[0]),
-                Row::Covered(totals[1]),
-                Row::Covered(totals[2]),
-                Row::OutsideScope,
-                Row::OutsideScope,
-                Row::Deferred,
-                Row::Deferred,
-            ],
+            rows: Self::rows(totals),
             owners: distinct,
             references: owners.len(),
             covered_bytes: add(add(totals[0], totals[1])?, totals[2])?,

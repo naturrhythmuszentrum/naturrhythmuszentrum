@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 /// Non-cloneable, individually admitted edge; its destruction never borrows a ledger.
 #[derive(Debug)]
-pub(crate) struct Witness {
+pub struct Witness {
     /// No strong reference to the graph owner exists.
     backing: Rc<Backing>,
     /// Original record occupation; acknowledgement does not erase witnessed evidence.
@@ -52,13 +52,17 @@ impl Sink {
 }
 impl Witness {
     /// Abandonment stays visible after the graph edge disappears.
-    pub(crate) fn status(&self, account: &mut ExecutionAccount) -> Result<Status, Error> {
+    /// # Errors
+    /// Preserves original account, occupation, phase and cumulative resource refusals.
+    pub fn status(&self, account: &mut ExecutionAccount) -> Result<Status, Error> {
         account.authenticate(self.backing.account)?;
         charge(&mut account.ledger, 2)?;
         Ok(self.backing.status.get())
     }
     /// Inspect immutable evidence while its admitted retaining edge prevents slot reuse.
-    pub(crate) fn inspect<T>(
+    /// # Errors
+    /// Preserves original account, occupation, phase and cumulative resource refusals.
+    pub fn inspect<T>(
         &self,
         account: &mut ExecutionAccount,
         inspect: impl FnOnce(&[u64], usize) -> T,

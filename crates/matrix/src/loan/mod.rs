@@ -26,7 +26,12 @@ pub use lc_shape::{
     LcRequestedCell, LcRequestedState, LcRequestedValues, LcShapeApplication, LcShapeAxes,
     LcShapeError, LcShapeRequest, LcShapeTile,
 };
+pub use lc_shape::{
+    LcGraphOriginalExclusion, LcGraphOriginalInput, LcGraphOriginalMeasure,
+    LcGraphOriginalObservation, LcGraphOriginalScope,
+};
 mod lifecycle;
+mod mask_account;
 mod masked_reader;
 mod owned_selection;
 mod payload;
@@ -36,6 +41,15 @@ mod registry;
 mod retained_dyadic_power;
 mod retained_expm1;
 mod scans;
+
+pub use graph::{
+    LcGraphAdmissionFailure, LcGraphBorrowed, LcGraphCapacities, LcGraphCompletion,
+    LcGraphDeliveryStatus, LcGraphError, LcGraphEvent, LcGraphEvidenceError, LcGraphEvidenceHandle,
+    LcGraphEvidencePull, LcGraphExactChildren, LcGraphHandle, LcGraphInputRequest,
+    LcGraphInputReturn, LcGraphInventoryRow, LcGraphMapping, LcGraphNativeFailure,
+    LcGraphNativeResidence, LcGraphNode, LcGraphOwner, LcGraphOwnerSet, LcGraphScope,
+    LcGraphScopeProgress, LcGraphSnapshot, LcGraphState, LcGraphWitness,
+};
 
 pub use account::ExecutionAccount;
 pub use application::{

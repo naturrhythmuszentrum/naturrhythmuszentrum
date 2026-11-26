@@ -49,18 +49,8 @@ pub(super) fn prepare<P: Scalar + 'static>(
     grow_tracked(&mut heap.loans.groups, plan.group_capacity, &mut guard)?;
     grow_tracked(&mut heap.loans.debits, plan.debit_capacity, &mut guard)?;
     grow_tracked(&mut heap.loans.pins, plan.pin_capacity, &mut guard)?;
-    let descriptors =
-        heap.descriptors
-            .slots
-            .change_tracked(3, heap.limits.descriptors, &mut guard)?;
-    let layouts = heap
-        .masks
-        .layouts
-        .change_tracked(1, heap.limits.descriptors, &mut guard)?;
-    let masks = heap
-        .masks
-        .masks
-        .change_tracked(1, heap.limits.descriptors, &mut guard)?;
+    let [descriptors, layouts, masks] =
+        crate::loan::lifecycle::admission::slots(heap, 3, &mut guard)?;
     let identity = identity(
         heap.scope,
         request.destination,

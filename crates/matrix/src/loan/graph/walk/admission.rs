@@ -95,7 +95,7 @@ fn validate(
     }
     for kind in kinds {
         charge(budget, 1)?; // N proposed node contract.
-        if !matches!(kind, Kind::Fixture) {
+        if matches!(kind, Kind::Unsupported) {
             return Err(LoanError::UnsupportedContract.into());
         }
     }

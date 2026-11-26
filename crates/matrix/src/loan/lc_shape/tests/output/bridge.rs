@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Original declarations survive consuming refusals and own detached captured pins.
 mod keys;
-mod oracle;
+pub(in crate::loan) mod oracle;
 use super::{TestResult, request, setup};
 use crate::loan::lc_shape::output::bridge::prepare_lc_omega_correspondence;
 use crate::{ExecutionAccount, Heap, LcOmegaOutput, LoanError};

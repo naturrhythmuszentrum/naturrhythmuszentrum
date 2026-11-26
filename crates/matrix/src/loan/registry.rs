@@ -516,6 +516,37 @@ impl Registry {
         }
         Ok(bytes)
     }
+    /// Separate scalar slabs from metadata and source-free constant owners without guessing capacity.
+    /// The caller funds one debit-slot visit; conservative dead debits remain until reconciliation.
+    pub(in crate::loan) fn graph_partition(
+        &self,
+    ) -> Result<([usize; 2], usize, usize), crate::HeapError> {
+        let mut elements = [0_usize; 2];
+        let mut numerical = 0_usize;
+        let mut constants = 0_usize;
+        for debit in self.debits.iter().flatten() {
+            if matches!(debit.kind, AllocationKind::Constant(_)) {
+                constants = crate::heap::resources::add(constants, debit.bytes)?;
+            }
+            let format = match debit.owner {
+                DebitOwner::Bundle(identity) => identity.format,
+                DebitOwner::LcApplication(identity) => identity.format,
+                _ => {
+                    if debit.elements != 0 {
+                        return Err(crate::HeapError::Capacity);
+                    }
+                    continue;
+                }
+            };
+            elements[format.index()] =
+                crate::heap::resources::add(elements[format.index()], debit.elements)?;
+            if debit.elements != 0 || matches!(debit.kind, AllocationKind::Numerical) {
+                numerical = crate::heap::resources::add(numerical, debit.bytes)?;
+            }
+        }
+        Ok((elements, numerical, constants))
+    }
+
     /// Exact live root identity; stale tickets cannot inspect a reused occupant.
     pub(super) fn group(&self, identity: Identity) -> Result<&Group, LoanError> {
         let group = self

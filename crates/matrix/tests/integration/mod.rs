@@ -113,3 +113,5 @@ mod quantity_covariance;
 mod quantity_frequency;
 
 mod axis_phase;
+
+mod lc_graph;

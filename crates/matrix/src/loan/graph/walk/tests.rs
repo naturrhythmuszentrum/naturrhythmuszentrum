@@ -5,6 +5,7 @@ mod audit;
 mod boundaries;
 mod epochs;
 mod native;
+mod preparation;
 
 use super::{
     Admission, Connection, Core, Error, Kind, NONE, READY,

@@ -60,6 +60,25 @@ impl SlotPlan {
     }
 }
 
+/// Exact native preparation carries an optional observer only after owning preflight succeeds.
+struct Mode<'a> {
+    /// Native reservations require exact advertised capacity.
+    exact: bool,
+    /// Acquired allocations consume only their original prepaid cleanup.
+    guard: Option<&'a mut crate::loan::preparation::Preparation>,
+    /// Borrowed observer has no ownership or additional reservation authority.
+    gate: Option<&'a crate::loan::graph::adapter::gate::Gate>,
+}
+impl Mode<'_> {
+    /// An arithmetic or contract error never calls this allocation-only marker.
+    fn allocation(&self) -> HeapError {
+        self.gate.map_or(
+            HeapError::Capacity,
+            crate::loan::graph::adapter::gate::Gate::allocation_failure,
+        )
+    }
+}
+
 impl<T> Slots<T> {
     /// Empty table without allocations.
     pub(crate) const fn new() -> Self {
@@ -82,7 +101,17 @@ impl<T> Slots<T> {
         retired: &[Key],
         limit: usize,
     ) -> Result<SlotPlan, HeapError> {
-        self.change_mode(count, keep, retired, limit, false, None)
+        self.change_mode(
+            count,
+            keep,
+            retired,
+            limit,
+            Mode {
+                exact: false,
+                guard: None,
+                gate: None,
+            },
+        )
     }
 
     /// Prepare native mask occupations inside a prechecked exact-capacity reservation.
@@ -92,7 +121,17 @@ impl<T> Slots<T> {
         retired: &[Key],
         limit: usize,
     ) -> Result<SlotPlan, HeapError> {
-        self.change_mode(count, None, retired, limit, true, None)
+        self.change_mode(
+            count,
+            None,
+            retired,
+            limit,
+            Mode {
+                exact: true,
+                guard: None,
+                gate: None,
+            },
+        )
     }
 
     /// Managed admission records each successful allocation in its prepaid prefix guard.
@@ -101,8 +140,19 @@ impl<T> Slots<T> {
         count: usize,
         limit: usize,
         guard: &mut crate::loan::preparation::Preparation,
+        gate: Option<&crate::loan::graph::adapter::gate::Gate>,
     ) -> Result<SlotPlan, HeapError> {
-        self.change_mode(count, None, &[], limit, true, Some(guard))
+        self.change_mode(
+            count,
+            None,
+            &[],
+            limit,
+            Mode {
+                exact: true,
+                guard: Some(guard),
+                gate,
+            },
+        )
     }
     /// Preserve ordinary growth while reserved owners request only the admitted capacity.
     fn change_mode(
@@ -111,8 +161,7 @@ impl<T> Slots<T> {
         keep: Option<Key>,
         retired: &[Key],
         limit: usize,
-        exact: bool,
-        mut guard: Option<&mut crate::loan::preparation::Preparation>,
+        mut mode: Mode<'_>,
     ) -> Result<SlotPlan, HeapError> {
         self.check_change(count, keep, retired)?;
         if count > limit || self.entries.len() > limit {
@@ -120,13 +169,13 @@ impl<T> Slots<T> {
         }
         #[cfg(test)]
         if count != 0 {
-            crate::loan::fault::before().map_err(|_| HeapError::Capacity)?;
+            crate::loan::fault::before().map_err(|_| mode.allocation())?;
         }
         let mut keys = Vec::new();
         keys.try_reserve_exact(count)
-            .map_err(|_| HeapError::Capacity)?;
+            .map_err(|_| mode.allocation())?;
         if count != 0
-            && let Some(guard) = guard.as_mut()
+            && let Some(guard) = mode.guard.as_mut()
         {
             guard.acquired(true).map_err(|_| HeapError::Capacity)?;
         }
@@ -148,22 +197,22 @@ impl<T> Slots<T> {
         let mut removals = Vec::new();
         removals
             .try_reserve_exact(retired.len())
-            .map_err(|_| HeapError::Capacity)?;
+            .map_err(|_| mode.allocation())?;
         removals.extend_from_slice(retired);
         {
-            let capacity = if exact {
+            let capacity = if mode.exact {
                 self.entries.capacity().max(end)
             } else {
                 growth_capacity::<Slot<T>>(self.entries.capacity(), end)?
             };
             if capacity > self.entries.capacity() {
                 #[cfg(test)]
-                crate::loan::fault::before().map_err(|_| HeapError::Capacity)?;
+                crate::loan::fault::before().map_err(|_| mode.allocation())?;
                 let mut replacement = Vec::new();
                 replacement
                     .try_reserve_exact(capacity)
-                    .map_err(|_| HeapError::Capacity)?;
-                if let Some(guard) = guard.as_mut() {
+                    .map_err(|_| mode.allocation())?;
+                if let Some(guard) = mode.guard.as_mut() {
                     guard.acquired(true).map_err(|_| HeapError::Capacity)?;
                 }
                 if replacement.capacity() != capacity {
@@ -171,7 +220,7 @@ impl<T> Slots<T> {
                 }
                 replacement.append(&mut self.entries);
                 self.entries = replacement;
-                if let Some(guard) = guard.as_mut() {
+                if let Some(guard) = mode.guard.as_mut() {
                     guard.retain_table();
                 }
             }
@@ -589,6 +638,7 @@ impl<T> Slots<T> {
         &mut self,
         plan: &FixedSlotPlan<N>,
         guard: &mut crate::loan::preparation::Preparation,
+        gate: Option<&crate::loan::graph::adapter::gate::Gate>,
     ) -> Result<SlotPlan, HeapError> {
         if self.entries.len() != plan.length || self.entries.capacity() > plan.capacity {
             return Err(HeapError::StaleHandle);
@@ -607,12 +657,18 @@ impl<T> Slots<T> {
                 appended += 1;
             }
         }
+        let allocation = || {
+            gate.map_or(
+                HeapError::Capacity,
+                crate::loan::graph::adapter::gate::Gate::allocation_failure,
+            )
+        };
         #[cfg(test)]
         if N != 0 {
-            crate::loan::fault::before().map_err(|_| HeapError::Capacity)?;
+            crate::loan::fault::before().map_err(|_| allocation())?;
         }
         let mut keys = Vec::new();
-        keys.try_reserve_exact(N).map_err(|_| HeapError::Capacity)?;
+        keys.try_reserve_exact(N).map_err(|_| allocation())?;
         if N != 0 {
             guard.acquired(true).map_err(|_| HeapError::Capacity)?;
         }
@@ -622,11 +678,11 @@ impl<T> Slots<T> {
         }
         if plan.capacity > self.entries.capacity() {
             #[cfg(test)]
-            crate::loan::fault::before().map_err(|_| HeapError::Capacity)?;
+            crate::loan::fault::before().map_err(|_| allocation())?;
             let mut replacement = Vec::new();
             replacement
                 .try_reserve_exact(plan.capacity)
-                .map_err(|_| HeapError::Capacity)?;
+                .map_err(|_| allocation())?;
             guard.acquired(true).map_err(|_| HeapError::Capacity)?;
             if replacement.capacity() != plan.capacity {
                 return Err(HeapError::Capacity);

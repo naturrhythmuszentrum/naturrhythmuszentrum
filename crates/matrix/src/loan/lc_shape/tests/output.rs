@@ -3,7 +3,7 @@
 
 mod authority;
 mod boundaries;
-mod bridge;
+pub(in crate::loan) mod bridge;
 mod execution;
 mod pending;
 mod publication;
@@ -18,15 +18,18 @@ use nrz_bindings::{
 };
 use nrz_scalar::Scalar;
 
-struct Setup<P: Scalar> {
-    heap: Heap,
-    account: ExecutionAccount,
-    inventory: LcInputInventory<P, 5>,
-    axes: LcShapeAxes,
-    registry: Registry,
-    radian: EntryMeaning,
+pub(in crate::loan) struct Setup<P: Scalar> {
+    pub(in crate::loan) heap: Heap,
+    pub(in crate::loan) account: ExecutionAccount,
+    pub(in crate::loan) inventory: LcInputInventory<P, 5>,
+    pub(in crate::loan) axes: LcShapeAxes,
+    pub(in crate::loan) registry: Registry,
+    pub(in crate::loan) radian: EntryMeaning,
 }
-fn setup<P: Scalar>(limits: Limits, counts: [usize; 3]) -> TestResult<Setup<P>> {
+pub(in crate::loan) fn setup<P: Scalar>(
+    limits: Limits,
+    counts: [usize; 3],
+) -> TestResult<Setup<P>> {
     let mut budget = Budget::new(limits)?;
     let question = fixture::inventory_question(true, true, &mut budget)?;
     let mut account = ExecutionAccount::new(budget)?;
@@ -69,7 +72,10 @@ fn setup<P: Scalar>(limits: Limits, counts: [usize; 3]) -> TestResult<Setup<P>> 
         },
     })
 }
-fn request<'a>(registry: &'a Registry, radian: &EntryMeaning) -> LcOutputDeclaration<'a> {
+pub(in crate::loan) fn request<'a>(
+    registry: &'a Registry,
+    radian: &EntryMeaning,
+) -> LcOutputDeclaration<'a> {
     LcOutputDeclaration {
         positions: [0, 1],
         quantities: LcQuantityDemand::Omega,
@@ -78,7 +84,7 @@ fn request<'a>(registry: &'a Registry, radian: &EntryMeaning) -> LcOutputDeclara
         registry,
     }
 }
-fn demand(
+pub(in crate::loan) fn demand(
     heap: &mut Heap,
     axes: &LcShapeAxes,
     cells: &[usize],
@@ -279,4 +285,18 @@ fn sink_returns<P: Scalar + 'static>() -> TestResult {
         crate::loan::graph::sink::tests::returned(output, variant, &mut s.account)?;
     }
     Ok(())
+}
+
+/// Export selected replay evidence from the owning bridge while preserving its original inventory.
+pub(in crate::loan) fn graph_certificate<P: Scalar>(
+    inventory: &LcInputInventory<P, 5>,
+    registry: &Registry,
+    radian: &EntryMeaning,
+    account: &mut ExecutionAccount,
+) -> TestResult<nrz_bindings::readings::algebra::enclosure::lc_root::Certificate> {
+    let output = LcOmegaOutput::declare(inventory, request(registry, radian), account)?;
+    let candidate = crate::loan::lc_shape::output::bridge::prepare_lc_omega_correspondence(
+        &output, registry, None, account,
+    )?;
+    Ok(candidate.certificate(&mut account.ledger)?)
 }

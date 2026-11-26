@@ -95,13 +95,7 @@ pub(in crate::loan) fn failed<P: Scalar + 'static>(
     heap: &mut crate::Heap,
     account: &mut crate::ExecutionAccount,
 ) -> TestResult {
-    pending
-        .native
-        .as_mut()
-        .expect("pending storage")
-        .storage
-        .outcomes[11]
-        .status = 6;
+    late_outcome(&mut pending);
     let ticket = pending.ticket();
     let before = account.usage().work;
     crate::loan::fault::reset_reads();
@@ -124,4 +118,17 @@ pub(in crate::loan) fn failed<P: Scalar + 'static>(
     assert_eq!(owner.cancel(heap, account)?.ticket(), ticket);
     assert_eq!(account.usage().work, before);
     Ok(())
+}
+
+/// Isolated defensive fixture changes only the final private record before traversal.
+pub(in crate::loan) fn late_outcome<P: Scalar>(
+    pending: &mut super::super::LcApplicationPending<'_, P, 5>,
+) {
+    pending
+        .native
+        .as_mut()
+        .expect("pending storage")
+        .storage
+        .outcomes[11]
+        .status = 6;
 }

@@ -688,13 +688,14 @@ fn pin_plan(heap: &Heap, budget: &mut nrz_bindings::Budget) -> Result<PinPlan, L
         .ok_or(LoanError::ByteOverflow)?;
     let bytes = rc_bytes::<PinRecord>();
     charge(budget, heap.resource_work()?)?;
-    heap.preflight_resources(
+    heap.preflight_resources_scoped(
         ResourcePlan {
             retained: bytes.checked_add(tables).ok_or(LoanError::ByteOverflow)?,
             scratch: old_tables.checked_mul(2).ok_or(LoanError::ByteOverflow)?,
             ..ResourcePlan::default()
         },
         ResourcePolicy::from_budget(budget),
+        Some(old_tables),
     )?;
     // Authentication, creation, two prepared records, destruction and one pin drop.
     let allocations = 1 + usize::from(pin_growth != 0) + usize::from(debit_growth != 0);

@@ -83,6 +83,15 @@ pub struct LcApplicationPending<'i, P: Scalar, const N: usize> {
     cancelled: Option<(Rc<MaskRecord>, Rc<LayoutRecord>)>,
 }
 
+impl<P: Scalar, const N: usize> LcApplicationPending<'_, P, N> {
+    /// Native cancellation removes this owner; inspection never restores it.
+    pub(in crate::loan) fn retained_correspondence(&self) -> Option<&Rc<LcOmegaCorrespondence>> {
+        self.native
+            .as_ref()
+            .map(|native| &native.storage.correspondence)
+    }
+}
+
 /// Refused admission returns the identical prepared facade without allocating an error box.
 #[repr(C)]
 pub struct LcApplicationAdmissionFailure<'i, P: Scalar, const N: usize> {

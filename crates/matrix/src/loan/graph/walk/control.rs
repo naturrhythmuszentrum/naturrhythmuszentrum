@@ -9,7 +9,7 @@ use crate::loan::{ExecutionAccount, LoanError, charge};
 use nrz_bindings::Budget;
 
 /// A preserved fixture outcome permits notification and subsequent input-use release.
-pub(super) const COMPLETE: u64 = 512;
+pub(in crate::loan::graph) const COMPLETE: u64 = 512;
 /// Required evidence has not yet been acknowledged; this blocks retirement only.
 pub(super) const EVIDENCE: u64 = 1024;
 /// A dependency refused or lacked its demanded coverage; never a numerical value.
@@ -26,12 +26,33 @@ pub(crate) enum Demand {
     /// Published coverage satisfies the original demand.
     Satisfied,
     /// The producer settled but cannot meet this required demand.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "the core retains independent demand-contract controls beyond the restricted adapter"
+        )
+    )]
     Missing,
     /// Declared absence is consumable by this edge's explicit contract.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "the core retains independent demand-contract controls beyond the restricted adapter"
+        )
+    )]
     AcceptedAbsence,
     /// A mandatory producer closed without its required contribution.
     RequiredAbsence,
     /// An inactive alternative has no outstanding numerical contribution.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "the core retains independent demand-contract controls beyond the restricted adapter"
+        )
+    )]
     Inactive,
     /// The producer refused; original evidence remains with its owner.
     Refused,
@@ -87,6 +108,7 @@ impl Core {
     }
     /// Explicit whole-owner abandonment spends only finite admission cleanup entitlements.
     /// No native outcome is invented; the callback surrenders only the fixture's owned uses.
+    #[cfg(test)]
     pub(crate) fn abandon(
         mut self,
         account: &ExecutionAccount,
@@ -130,7 +152,7 @@ impl Core {
                 if backing.control.flags & super::STOPPED != 0 {
                     return Err(Error::WorkStopped);
                 }
-                if backing.control.flags & super::INVALIDATING != 0 {
+                if backing.control.flags & (super::INVALIDATING | super::SCOPING) != 0 {
                     return Err(Error::ControlInProgress);
                 }
                 if backing.nodes[handle.slot].flags & COMPLETE != 0 {
@@ -176,7 +198,7 @@ impl Core {
                 if backing.control.flags & super::STOPPED != 0 {
                     return Err(Error::WorkStopped);
                 }
-                if backing.control.flags & super::INVALIDATING != 0 {
+                if backing.control.flags & (super::INVALIDATING | super::SCOPING) != 0 {
                     return Err(Error::ControlInProgress);
                 }
                 if backing.drive == 0 {
@@ -196,7 +218,11 @@ impl Core {
     }
 }
 /// H entry, A admitted owner and N exact occupation; no foreign slot is inspected.
-fn authenticate(backing: &Backing, handle: Handle, budget: &mut Budget) -> Result<(), Error> {
+pub(super) fn authenticate(
+    backing: &Backing,
+    handle: Handle,
+    budget: &mut Budget,
+) -> Result<(), Error> {
     charge(budget, 2)?;
     if handle.owner != backing.identity {
         return Err(LoanError::ForeignOwner.into());
@@ -242,8 +268,8 @@ pub(super) fn refresh(backing: &mut Backing, slot: usize) {
         backing.nodes[slot].flags &= !READY;
     }
 }
-/// Notification has priority; cleanup visits consume only previously charged P events.
-pub(super) fn step(
+/// Notification has priority; native adapters preserve their own terminal evidence before completion.
+pub(super) fn step<const NATIVE: bool>(
     backing: &mut Backing,
     slot: usize,
     budget: &mut Budget,
@@ -251,7 +277,7 @@ pub(super) fn step(
     release: &mut impl FnMut(usize),
 ) -> Result<Control, Error> {
     if backing.nodes[slot].links[5] != NONE {
-        notify(backing, slot, budget, demand)
+        notify::<NATIVE>(backing, slot, budget, demand)
     } else if backing.nodes[slot].links[1] != NONE {
         enter(backing)?;
         Ok(release_one(backing, slot, release))
@@ -267,7 +293,7 @@ pub(super) fn step(
     }
 }
 /// Private native metadata checks precede the complete edge/count/path commit prepayment.
-fn notify(
+fn notify<const NATIVE: bool>(
     backing: &mut Backing,
     slot: usize,
     budget: &mut Budget,
@@ -311,7 +337,7 @@ fn notify(
             backing.nodes[consumer].flags |= MISSING;
         }
         if settles {
-            if backing.nodes[consumer].flags & (MISSING | INVALID) == MISSING {
+            if !NATIVE && backing.nodes[consumer].flags & (MISSING | INVALID) == MISSING {
                 backing.nodes[consumer].flags |= TERMINAL | COMPLETE | EVIDENCE;
                 backing.nodes[consumer].links[5] = backing.nodes[consumer].links[0];
             }

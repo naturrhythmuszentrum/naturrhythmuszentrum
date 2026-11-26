@@ -123,6 +123,15 @@ impl Storage {
         Ok(bytes)
     }
 
+    /// Legacy numerical slab capacity, excluding both fixed slot-table allocations.
+    pub(crate) fn numerical_bytes(&self) -> Result<usize, HeapError> {
+        let tables =
+            crate::heap::resources::add(self.single.owned_bytes()?, self.double.owned_bytes()?)?;
+        self.owned_bytes()?
+            .checked_sub(tables)
+            .ok_or(HeapError::Capacity)
+    }
+
     /// Plan amortized table growth after same-call retirement reuse, before slab allocation.
     pub(crate) fn growth_bytes<P: Scalar + 'static>(
         &self,

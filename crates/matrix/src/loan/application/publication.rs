@@ -243,12 +243,13 @@ pub(super) fn shell_preflight<P: Scalar>(
             crate::loan::AT,
         )?;
     }
-    let mut permit = heap.preflight_resources(
+    let mut permit = heap.preflight_resources_scoped(
         ResourcePlan {
             retained: crate::loan::rc_bytes::<MaskRecord>(),
             ..ResourcePlan::default()
         },
         ResourcePolicy::from_budget(budget),
+        Some(0),
     )?;
     permit.account = Some(core.host.identity.account);
     permit.storage(heap.storage.epoch())?;

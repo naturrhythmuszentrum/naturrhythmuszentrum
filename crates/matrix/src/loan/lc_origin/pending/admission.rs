@@ -98,14 +98,17 @@ pub(super) fn prepare<P: Scalar + 'static, const N: usize>(
     let descriptors = heap.descriptors.slots.prepare_fixed(
         &plan.descriptor_keys.take().ok_or(LoanError::WrongLoan)?,
         &mut guard,
+        heap.graph_gate.as_deref(),
     )?;
     let layouts = heap.masks.layouts.prepare_fixed(
         &plan.layout_keys.take().ok_or(LoanError::WrongLoan)?,
         &mut guard,
+        heap.graph_gate.as_deref(),
     )?;
     let masks = heap.masks.masks.prepare_fixed(
         &plan.mask_keys.take().ok_or(LoanError::WrongLoan)?,
         &mut guard,
+        heap.graph_gate.as_deref(),
     )?;
     let slots = [descriptors, layouts, masks];
     let identity = identity(prepared, heap, &plan, account, &slots)?;

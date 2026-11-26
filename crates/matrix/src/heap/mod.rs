@@ -45,6 +45,8 @@ use schema::Schema;
 /// admits coherent homogeneous imports and publishes the supported checked operation results.
 /// Descriptor-side interpretation records are opaque to numerical storage.
 pub struct Heap {
+    /// Temporary bounded graph observer; ordinary native calls retain their existing scope.
+    pub(crate) graph_gate: Option<std::rc::Rc<crate::loan::graph::adapter::gate::Gate>>,
     /// Unique process-local scope; a foreign handle is refused before indexing.
     pub(crate) scope: u64,
     /// Recoverable resource policy.
@@ -91,6 +93,7 @@ impl Heap {
     /// Returns `HeapError::CounterExhausted` if no new process-local scope exists.
     pub fn new(limits: HeapLimits) -> Result<Self, HeapError> {
         Ok(Self {
+            graph_gate: None,
             scope: identity::identity()?,
             limits,
             storage: Storage::new(),

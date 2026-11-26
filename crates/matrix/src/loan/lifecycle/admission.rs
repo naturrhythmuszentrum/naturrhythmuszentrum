@@ -107,25 +107,69 @@ pub(super) fn request<P: Scalar + 'static>(
     layout: Layout,
     account: &mut ExecutionAccount,
 ) -> Result<OwnedLoan<P>, LoanError> {
-    account.authenticate(declaration.account)?;
-    if declaration.axis.scope != heap.scope {
+    let mut declaration = Some(declaration);
+    request_preserving(heap, &mut declaration, layout, account)
+}
+/// The graph retains its exact declaration until the complete native transaction can commit.
+pub(in crate::loan) fn request_preserving<P: Scalar + 'static>(
+    heap: &mut Heap,
+    declaration: &mut Option<HostTileDeclaration<P>>,
+    layout: Layout,
+    account: &mut ExecutionAccount,
+) -> Result<OwnedLoan<P>, LoanError> {
+    let original = declaration.as_ref().ok_or(LoanError::WrongLoan)?;
+    account.authenticate(original.account)?;
+    if original.axis.scope != heap.scope {
         return Err(LoanError::ForeignOwner);
     }
     account
         .ledger
         .with_work_phase(crate::loan::FAMILY, "loan admission", |budget| {
-            let plan = Plan::new(heap, &declaration, &layout, budget)?;
+            let plan = Plan::new(
+                heap,
+                declaration.as_ref().ok_or(LoanError::WrongLoan)?,
+                &layout,
+                budget,
+            )?;
             let prepared = prepare(heap, declaration, layout, plan)?;
             Ok(install(heap, prepared))
         })
 }
+/// All three native tables share the original preflight and acquired-prefix observer.
+pub(in crate::loan) fn slots(
+    heap: &mut Heap,
+    channels: usize,
+    guard: &mut Preparation,
+) -> Result<[SlotPlan; 3], LoanError> {
+    let descriptors = heap.descriptors.slots.change_tracked(
+        channels,
+        heap.limits.descriptors,
+        guard,
+        heap.graph_gate.as_deref(),
+    )?;
+    let layouts = heap.masks.layouts.change_tracked(
+        1,
+        heap.limits.descriptors,
+        guard,
+        heap.graph_gate.as_deref(),
+    )?;
+    let masks = heap.masks.masks.change_tracked(
+        1,
+        heap.limits.descriptors,
+        guard,
+        heap.graph_gate.as_deref(),
+    )?;
+    Ok([descriptors, layouts, masks])
+}
+
 /// Allocate every private owner after the complete simultaneous preflight and cleanup prepayment.
 fn prepare<P: Scalar + 'static>(
     heap: &mut Heap,
-    declaration: HostTileDeclaration<P>,
+    original: &mut Option<HostTileDeclaration<P>>,
     layout: Layout,
     mut plan: Plan,
 ) -> Result<Prepared, LoanError> {
+    let declaration = original.as_ref().ok_or(LoanError::WrongLoan)?;
     let receipt_identity = plan.cleanup.identity;
     let receipt = std::mem::replace(
         &mut plan.cleanup,
@@ -135,22 +179,10 @@ fn prepare<P: Scalar + 'static>(
     grow_tracked(&mut heap.loans.groups, plan.group_capacity, &mut guard)?;
     grow_tracked(&mut heap.loans.debits, plan.debit_capacity, &mut guard)?;
     grow_tracked(&mut heap.loans.pins, plan.pin_capacity, &mut guard)?;
-    let descriptors = heap.descriptors.slots.change_tracked(
-        plan.channels,
-        heap.limits.descriptors,
-        &mut guard,
-    )?;
-    let layouts = heap
-        .masks
-        .layouts
-        .change_tracked(1, heap.limits.descriptors, &mut guard)?;
-    let masks = heap
-        .masks
-        .masks
-        .change_tracked(1, heap.limits.descriptors, &mut guard)?;
+    let [descriptors, layouts, masks] = slots(heap, plan.channels, &mut guard)?;
     let identity = identity(
         heap.scope,
-        &declaration,
+        declaration,
         &plan,
         &descriptors,
         &layouts,
@@ -165,7 +197,7 @@ fn prepare<P: Scalar + 'static>(
         bundle,
         pin,
         witness,
-    } = shells(&declaration, layout, identity, &mut guard)?;
+    } = shells(declaration, layout, identity, &mut guard)?;
     let mut records = vector(plan.channels)?;
     guard.acquired(true)?;
     for (channel, present) in HostChannel::ALL.into_iter().zip(plan.present) {
@@ -186,28 +218,33 @@ fn prepare<P: Scalar + 'static>(
     let descriptors = descriptors.bind(records)?;
     let layouts = layouts.bind(layout_records)?;
     let masks = masks.bind(mask_records)?;
+    #[cfg(test)]
+    crate::loan::fault::before()?;
+    let shell = Box::<HostCore>::new_uninit();
+    guard.acquired(false)?;
+    let cleanup = guard.finish()?;
+    let declaration = original.take().ok_or(LoanError::WrongLoan)?;
     let declaration = Declaration {
         symbols: declaration.symbols,
         axis: declaration.axis,
         extent: declaration.extent,
         coverage: declaration.coverage,
     };
-    #[cfg(test)]
-    crate::loan::fault::before()?;
-    let mut core = Box::new(HostCore {
-        retained_law: None,
-        identity,
-        declaration,
-        channels,
-        layout,
-        bundle,
-        pin,
-        headers,
-        cleanup: crate::loan::registry::CleanupReceipt::empty(receipt_identity),
-        witness,
-    });
-    guard.acquired(false)?;
-    core.cleanup = guard.finish()?;
+    let core = Box::write(
+        shell,
+        HostCore {
+            retained_law: None,
+            identity,
+            declaration,
+            channels,
+            layout,
+            bundle,
+            pin,
+            headers,
+            cleanup,
+            witness,
+        },
+    );
     Ok(Prepared {
         core,
         descriptors,

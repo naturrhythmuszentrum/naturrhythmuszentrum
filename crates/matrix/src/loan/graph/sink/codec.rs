@@ -86,6 +86,24 @@ pub(crate) enum Outcome {
 /// Original walk capacity evidence is preserved without a second classification.
 pub(crate) use super::super::walk::Capacity;
 
+/// Closed failed-probe classes carry no invented required/available byte quantity.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(u64)]
+pub(crate) enum ProbeFailure {
+    /// Original cumulative Work stopped the operation.
+    WorkStopped,
+    /// Fallible allocation failed after admitted preflight.
+    Allocation,
+    /// An independent native owner still blocks the operation.
+    Ownership,
+    /// Explicit original-closure repair is required.
+    Repair,
+    /// The typed native cause is terminal and returned intact.
+    Terminal,
+    /// Original precision-specific element capacity is temporarily occupied.
+    Elements,
+}
+
 /// Only these bounded fields enter the sink; caller capabilities never enter this enum.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Evidence {
@@ -95,16 +113,19 @@ pub(crate) enum Evidence {
     Refusal(Refusal),
     /// Required capacity receipt.
     Probe(Capacity),
+    /// Entered probe returned a typed cause instead of a classified byte requirement.
+    ProbeFailure(ProbeFailure),
     /// Required attempt exhaustion receipt, without a fictitious probe.
     Exhaustion,
 }
 impl Evidence {
     /// Closed schema selection is independent of caller-supplied byte counts.
+    #[cfg(test)]
     pub(crate) const fn encoding(self) -> Encoding {
         match self {
             Self::Outcome(_) => Encoding::Outcome,
             Self::Refusal(_) => Encoding::Refusal,
-            Self::Probe(_) => Encoding::Probe,
+            Self::Probe(_) | Self::ProbeFailure(_) => Encoding::Probe,
             Self::Exhaustion => Encoding::Exhaustion,
         }
     }
@@ -126,6 +147,7 @@ impl Evidence {
             Self::Probe(Capacity::Intrinsic { required, limit }) => {
                 (Encoding::Probe, 3, [2, required, limit])
             }
+            Self::ProbeFailure(value) => (Encoding::Probe, 3, [3, value as u64, 0]),
             Self::Exhaustion => (Encoding::Exhaustion, 4, [0, 0, 0]),
         };
         if encoding != expected {

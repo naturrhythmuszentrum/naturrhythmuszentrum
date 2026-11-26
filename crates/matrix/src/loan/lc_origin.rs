@@ -211,6 +211,13 @@ pub(in crate::loan) struct LcBundleOwner<C> {
     seal: Option<LcSeal>,
 }
 
+impl<C> LcBundleOwner<C> {
+    /// Borrow the law retained by this actual published bundle, without another owner edge.
+    pub(in crate::loan) fn retained_correspondence(&self) -> Option<&Rc<C>> {
+        self.storage.as_ref().map(|storage| &storage.correspondence)
+    }
+}
+
 /// Outside uses have their own debit, without an ordinary pin-index entry.
 #[repr(C)]
 struct LcUsePayload<C> {

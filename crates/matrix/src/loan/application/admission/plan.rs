@@ -287,6 +287,7 @@ impl Plan {
             retained = add(retained, owner.bytes)?;
         }
         let mut scratch = 0;
+        let mut overlap = 0;
         for (growth, old) in [
             heap.descriptors
                 .slots
@@ -302,6 +303,7 @@ impl Plan {
             crate::loan::lifecycle::admission::growth(&heap.loans.pins, self.pin_capacity)?,
         ] {
             retained = add(retained, growth)?;
+            overlap = add(overlap, old)?;
             scratch = add(scratch, old.checked_mul(2).ok_or(LoanError::ByteOverflow)?)?;
         }
         // Prepared keys and values coexist until their no-fail installation consumes the vectors.
@@ -346,7 +348,11 @@ impl Plan {
                 crate::loan::AT,
             )?;
         }
-        Ok(heap.preflight_resources(resources, ResourcePolicy::from_budget(budget))?)
+        Ok(heap.preflight_resources_scoped(
+            resources,
+            ResourcePolicy::from_budget(budget),
+            Some(overlap),
+        )?)
     }
 }
 

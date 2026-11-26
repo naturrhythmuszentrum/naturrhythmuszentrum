@@ -3,6 +3,7 @@
 
 mod native;
 pub(in crate::loan) use native::returned;
+mod paired;
 mod prefixes;
 mod review;
 
@@ -47,6 +48,7 @@ pub(in crate::loan) fn run() -> TestResult {
     interruptions()?;
     prefixes::run()?;
     review::run()?;
+    paired::run()?;
     refusals()
 }
 /// Every fixture includes five original Work, before account creation.

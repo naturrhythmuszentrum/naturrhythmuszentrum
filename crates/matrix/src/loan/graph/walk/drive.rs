@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! One bounded core visit separates capacity evidence from any future numerical adapter.
 
+#[cfg(test)]
 use super::{
-    ATTEMPTS, Core, Error, Handle, INVALID, INVALIDATING, LIVE, NONE, READY, STARTED, STOPPED,
-    TERMINAL, WAITING, advance, bitmap, enter,
+    ATTEMPTS, Core, Handle, INVALID, INVALIDATING, LIVE, READY, STARTED, STOPPED, TERMINAL,
+    advance, bitmap, enter,
 };
+use super::{Error, NONE, WAITING};
+#[cfg(test)]
+use crate::loan::ExecutionAccount;
 use crate::loan::graph::Backing;
-use crate::loan::{ExecutionAccount, LoanError, charge};
+use crate::loan::{LoanError, charge};
 use nrz_bindings::Budget;
 
 /// A core fixture's explicit capacity result; no mathematical result is manufactured.
@@ -22,6 +26,13 @@ pub(crate) enum Capacity {
         available: u64,
     },
     /// The addition alone exceeds the immutable dimension.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "the core capacity classifier retains its independently tested intrinsic-refusal case"
+        )
+    )]
     Intrinsic {
         /// Addition alone, excluding the releasable baseline.
         required: u64,
@@ -31,6 +42,7 @@ pub(crate) enum Capacity {
 }
 /// One entered transition consumes one cumulative traversal unit, never a refilled slice.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[cfg(test)]
 pub(crate) enum Visit {
     /// No executable leaf remains in this core snapshot.
     Quiescent,
@@ -49,8 +61,10 @@ pub(crate) enum Visit {
     /// Intrinsic refusal is terminal rather than a capacity retry.
     Refused(Handle, Capacity),
 }
+#[cfg(test)]
 impl Core {
     /// A one-transition drive slice allows the caller to compose native phases only in F.
+    #[cfg(test)]
     pub(crate) fn drive_one(
         &mut self,
         account: &mut ExecutionAccount,
@@ -61,15 +75,29 @@ impl Core {
     ) -> Result<Visit, Error> {
         self.drive_slice(1, account, probe, demand, release, receipt)
     }
-    /// A smaller call slice never refills original attempts, Work or traversal allowance.
+    /// Fixture callbacks exercise the same walk without installing a delivery owner.
+    #[cfg(test)]
     pub(crate) fn drive_slice(
         &mut self,
         slice: usize,
         account: &mut ExecutionAccount,
-        mut probe: impl FnMut(usize, &mut Budget) -> Result<Capacity, LoanError>,
+        probe: impl FnMut(usize, &mut Budget) -> Result<Capacity, LoanError>,
+        demand: impl FnMut(usize, &mut Budget) -> Result<super::control::Demand, LoanError>,
+        release: impl FnMut(usize),
+        receipt: impl FnMut(super::waiting::ScanReceipt),
+    ) -> Result<Visit, Error> {
+        let mut attempt = super::attempt::Fixture { probe, receipt };
+        self.drive_prepared(slice, account, &mut attempt, demand, release)
+    }
+    /// A smaller call slice never refills original attempts, Work or traversal allowance.
+    #[cfg(test)]
+    pub(crate) fn drive_prepared(
+        &mut self,
+        slice: usize,
+        account: &mut ExecutionAccount,
+        attempt: &mut impl super::attempt::Attempt,
         mut demand: impl FnMut(usize, &mut Budget) -> Result<super::control::Demand, LoanError>,
         mut release: impl FnMut(usize),
-        mut receipt: impl FnMut(super::waiting::ScanReceipt),
     ) -> Result<Visit, Error> {
         account.authenticate(self.reservation.backing.account)?;
         let backing =
@@ -81,7 +109,7 @@ impl Core {
                 if backing.control.flags & STOPPED != 0 {
                     return Err(Error::WorkStopped);
                 }
-                if backing.control.flags & INVALIDATING != 0 {
+                if backing.control.flags & (INVALIDATING | super::SCOPING) != 0 {
                     return Ok(Visit::ControlPending);
                 }
                 let mut last = Visit::Paused;
@@ -100,7 +128,7 @@ impl Core {
                     }
                     charge(budget, 1)?; // N node phase and current eligibility.
                     last = if super::control::is_control(backing, slot) {
-                        Visit::Control(super::control::step(
+                        Visit::Control(super::control::step::<false>(
                             backing,
                             slot,
                             budget,
@@ -108,7 +136,7 @@ impl Core {
                             &mut release,
                         )?)
                     } else {
-                        visit(backing, slot, budget, &mut probe, &mut receipt)?
+                        visit(backing, slot, budget, attempt)?
                     };
                 }
                 Ok(last)
@@ -118,12 +146,12 @@ impl Core {
     }
 }
 /// Fund each fixed mutation before consuming an attempt or changing ready/wait membership.
+#[cfg(test)]
 fn visit(
     backing: &mut Backing,
     slot: usize,
     budget: &mut Budget,
-    probe: &mut impl FnMut(usize, &mut Budget) -> Result<Capacity, LoanError>,
-    receipt: &mut impl FnMut(super::waiting::ScanReceipt),
+    attempt: &mut impl super::attempt::Attempt,
 ) -> Result<Visit, Error> {
     charge(budget, 1)?; // N leaf state, original attempt count and prepared update.
     let node = &backing.nodes[slot];
@@ -141,9 +169,10 @@ fn visit(
     let exhausted = node.attempts == 0;
     // H saved cyclic cursor + complete changed ready path. A probe is entered only afterward.
     charge(budget, 1 + bitmap::height(backing.nodes.len()))?;
+    attempt.prepare(handle, exhausted, budget)?;
     if exhausted {
         enter(backing)?;
-        receipt(super::waiting::ScanReceipt {
+        attempt.receipt(super::waiting::ScanReceipt {
             handle,
             capacity: None,
         });
@@ -157,8 +186,8 @@ fn visit(
     // Entered capacity probes retain both the consumed attempt and their actual native Work.
     enter(backing)?;
     backing.nodes[slot].attempts -= 1;
-    let capacity = probe(slot, budget)?;
-    receipt(super::waiting::ScanReceipt {
+    let capacity = attempt.probe(slot, budget)?;
+    attempt.receipt(super::waiting::ScanReceipt {
         handle,
         capacity: Some(capacity),
     });
@@ -186,12 +215,13 @@ fn visit(
     }
 }
 /// All ready-path visits were prepaid before the attempted transition.
+#[cfg(test)]
 fn clear(backing: &mut Backing, slot: usize) {
     bitmap::set(&mut backing.ready, backing.nodes.len(), slot, false);
     backing.nodes[slot].flags &= !READY;
 }
 /// The membership serial is checked before links change; append order is deterministic.
-fn append(backing: &mut Backing, slot: usize, budget: &mut Budget) -> Result<(), Error> {
+pub(super) fn append(backing: &mut Backing, slot: usize, budget: &mut Budget) -> Result<(), Error> {
     let serial = backing.control.epochs[4]
         .checked_add(1)
         .ok_or(LoanError::CountOverflow)?;

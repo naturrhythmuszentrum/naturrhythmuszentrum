@@ -116,6 +116,15 @@ impl Heap {
         account: &mut ExecutionAccount,
         slot_allowance: usize,
     ) -> Result<Residence, LoanError> {
+        self.residence_status(account, slot_allowance)
+            .map(|(residence, _)| residence)
+    }
+    /// Preserve an actual original Work stop beside the existing soft pending residence report.
+    pub(in crate::loan) fn residence_status(
+        &mut self,
+        account: &mut ExecutionAccount,
+        slot_allowance: usize,
+    ) -> Result<(Residence, bool), LoanError> {
         let reconciled = self.reconcile_detached(account, slot_allowance, None);
         let reclaimed = if matches!(reconciled, ScanOutcome::Complete) {
             self.reclaim(account, slot_allowance, None)
@@ -131,15 +140,23 @@ impl Heap {
             return Err(error);
         }
         if !complete {
-            return Ok(Residence::Pending {
-                elements: None,
-                bytes: None,
-            });
+            let stopped = matches!(reconciled, ScanOutcome::WorkExhausted(_))
+                || matches!(reclaimed, ScanOutcome::WorkExhausted(_));
+            return Ok((
+                Residence::Pending {
+                    elements: None,
+                    bytes: None,
+                },
+                stopped,
+            ));
         }
         self.resident_inventory(account)
     }
     /// Inventory traversals begin only after their full slot and owner cost is paid.
-    fn resident_inventory(&self, account: &mut ExecutionAccount) -> Result<Residence, LoanError> {
+    fn resident_inventory(
+        &self,
+        account: &mut ExecutionAccount,
+    ) -> Result<(Residence, bool), LoanError> {
         let inventory_work = [
             self.resource_work()?,
             self.storage.scan_work(),
@@ -161,10 +178,13 @@ impl Heap {
             })
             .is_err()
         {
-            return Ok(Residence::Pending {
-                elements: None,
-                bytes: None,
-            });
+            return Ok((
+                Residence::Pending {
+                    elements: None,
+                    bytes: None,
+                },
+                true,
+            ));
         }
         let occupied = self
             .loans
@@ -193,14 +213,20 @@ impl Heap {
         ];
         let bytes = self.resource_bytes()?;
         if occupied {
-            Ok(Residence::Pending {
-                elements: Some(elements),
-                bytes: Some(bytes),
-            })
+            Ok((
+                Residence::Pending {
+                    elements: Some(elements),
+                    bytes: Some(bytes),
+                },
+                false,
+            ))
         } else {
-            Ok(Residence::Empty {
-                retained_bytes: bytes,
-            })
+            Ok((
+                Residence::Empty {
+                    retained_bytes: bytes,
+                },
+                false,
+            ))
         }
     }
     /// Authenticate every moved allocation entitlement before the root can be destroyed.

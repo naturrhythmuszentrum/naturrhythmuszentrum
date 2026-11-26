@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Admitted in-process evidence, separate from numerical and adapter authority.
 
-mod admission;
-mod codec;
-mod delivery;
+pub(in crate::loan::graph) mod admission;
+pub(in crate::loan::graph) mod codec;
+pub(in crate::loan::graph) mod delivery;
 #[cfg(test)]
 pub(in crate::loan) mod tests;
-mod witness;
+pub(in crate::loan::graph) mod witness;
 
 use crate::loan::{ExecutionAccount, LoanError, charge};
 use codec::{Encoding, Position};
@@ -17,7 +17,7 @@ use std::{
 
 /// Closed sink stops retain the native capability at their consuming boundary.
 #[derive(Debug, thiserror::Error)]
-pub(crate) enum Error {
+pub enum Error {
     /// Original account or storage refusal.
     #[error("sink native refusal: {0}")]
     Native(#[from] LoanError),
@@ -37,7 +37,7 @@ pub(crate) enum Error {
 /// Completion is explicit; abandonment can never masquerade as delivery.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(u64)]
-pub(crate) enum Status {
+pub enum Status {
     /// Required destinations remain outstanding.
     Incomplete,
     /// Every admitted required destination was acknowledged.
@@ -49,11 +49,11 @@ pub(crate) enum Status {
 }
 /// Authority names one original owner, position and nonwrapping occupation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct Handle {
+pub struct Handle {
     /// Original sink identity.
     owner: u64,
     /// Admitted destination.
-    slot: usize,
+    pub(in crate::loan::graph) slot: usize,
     /// Exact current occupation.
     generation: u64,
 }

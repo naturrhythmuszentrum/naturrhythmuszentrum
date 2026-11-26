@@ -86,13 +86,14 @@ pub(super) fn acquire<P: Scalar + 'static>(
         .ok_or(LoanError::ByteOverflow)?;
     let scratch = old.checked_mul(2).ok_or(LoanError::ByteOverflow)?;
     charge(budget, heap.resource_work()?)?;
-    let mut permit = heap.preflight_resources(
+    let mut permit = heap.preflight_resources_scoped(
         ResourcePlan {
             retained,
             scratch,
             ..ResourcePlan::default()
         },
         ResourcePolicy::from_budget(budget),
+        Some(old),
     )?;
     permit.account = Some(s.identity.account);
     let revision = heap.loans.next_revision()?;

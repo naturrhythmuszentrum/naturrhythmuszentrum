@@ -121,6 +121,23 @@ pub struct LcApplicationFailed<'i, P: Scalar, const N: usize> {
     /// Earlier private records grant no result authority.
     owner: LcApplicationPending<'i, P, N>,
 }
+impl<P: Scalar, const N: usize> LcApplicationEvaluated<'_, P, N> {
+    /// Borrow the still-owned law through the original native continuation.
+    pub(in crate::loan) fn retained_correspondence(
+        &self,
+    ) -> Option<&std::rc::Rc<nrz_bindings::LcOmegaCorrespondence>> {
+        self.owner.retained_correspondence()
+    }
+}
+impl<P: Scalar, const N: usize> LcApplicationFailed<'_, P, N> {
+    /// A failed traversal retains its law until the original cancellation releases it.
+    pub(in crate::loan) fn retained_correspondence(
+        &self,
+    ) -> Option<&std::rc::Rc<nrz_bindings::LcOmegaCorrespondence>> {
+        self.owner.retained_correspondence()
+    }
+}
+
 /// Readiness or prepayment refusal preserves retry; a started traversal failure permits cancellation.
 #[derive(Debug)]
 pub enum LcApplicationEvaluationFailure<'i, P: Scalar, const N: usize> {

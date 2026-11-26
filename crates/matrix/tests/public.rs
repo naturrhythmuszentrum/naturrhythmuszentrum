@@ -156,3 +156,6 @@ mod omega_oracle;
     reason = "the exact angular-frequency fixture serves public integration and conformance tests"
 )]
 mod angular_testing;
+
+#[path = "../src/testing/observer_dispatch.rs"]
+mod observer_dispatch;

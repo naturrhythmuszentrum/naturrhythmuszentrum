@@ -19,12 +19,40 @@ pub(crate) enum Route {
     /// Native variable payloads are returned intact with their consuming owner.
     ConsumingReturn,
     /// A node would retain the unsupported-scale String.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "the closed admission policy retains independently tested unsupported payload routes"
+        )
+    )]
     RetainUnsupportedScale,
     /// A node would retain the conflicting-kind String.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "the closed admission policy retains independently tested unsupported payload routes"
+        )
+    )]
     RetainConflictingKind,
     /// A node would retain the series-evidence Rational.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "the closed admission policy retains independently tested unsupported payload routes"
+        )
+    )]
     RetainSeriesConstant,
     /// No owning-layer bound or intact consuming-return route is established.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "the closed admission policy retains independently tested unsupported payload routes"
+        )
+    )]
     Unproved,
 }
 /// Fixed original node contract, with no admission authority manufactured from an error tag.
@@ -119,6 +147,26 @@ impl Plan {
             source,
         })
     }
+}
+/// Actual fixed sink allocation bytes, including a first account registration when needed.
+pub(in crate::loan::graph) fn planned_bytes(
+    capacity: Capacities,
+    account: &ExecutionAccount,
+) -> Result<usize, Error> {
+    let bytes = add(
+        rc_bytes::<Backing>(),
+        add(
+            bytes::<Slot>(capacity.records)?,
+            add(
+                bytes::<u64>(capacity.words)?,
+                bytes::<Cell<u64>>(capacity.witnesses)?,
+            )?,
+        )?,
+    )?;
+    Ok(add(
+        bytes,
+        usize::from(account.delivery.is_none()) * rc_bytes::<Cell<usize>>(),
+    )?)
 }
 impl Sink {
     /// Prior graph rows are borrowed and authenticated; all live sink debits are account-resident.

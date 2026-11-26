@@ -17,6 +17,8 @@ use std::{fmt, rc::Rc};
 
 /// One cumulative accounting boundary.
 const AT: Location = Location::new("LC omega correspondence");
+/// Two reference-count words for the receiving Rc, under the existing 64-bit owner tariff.
+const RECEIVING_RC_CONTROL_BYTES: u64 = 16;
 /// Preserve structured CAS refusals through the bindings boundary.
 type Result<T> = std::result::Result<T, AdmissionError>;
 
@@ -175,10 +177,67 @@ impl LcOmegaCorrespondence {
         Rc::ptr_eq(&self.cas, &other.cas)
     }
 
+    /// Captured declaration allowance, excluding the caller's initial token slot.
+    /// This observes the original retained partition, not receiving-store capacity.
+    /// # Errors
+    /// Refuses an unrepresentable owning-layer byte inventory.
+    pub fn captured_declaration_bytes(&self) -> Result<u64> {
+        self.declaration
+            .retained_bytes()?
+            .checked_sub(size_of::<LcOmegaDeclarationToken>() as u64)
+            .ok_or(AdmissionError::ResourceLimit)
+    }
+
+    /// Compare the retained declaration allocation without exposing its authority.
+    /// The original token identity check retains its existing Work charge.
+    /// # Errors
+    /// Preserves original-account exhaustion from the identity check.
+    pub fn captures_declaration(
+        &self,
+        token: &LcOmegaDeclarationToken,
+        budget: &mut Budget,
+    ) -> Result<bool> {
+        match self.declaration.check_same(token, budget) {
+            Ok(()) => Ok(true),
+            Err(AdmissionError::ValueMismatch) => Ok(false),
+            Err(error) => Err(error),
+        }
+    }
+
+    /// Compare captured allocations independently of correspondence allocation identity.
+    /// # Errors
+    /// Preserves original-account exhaustion from the identity check.
+    pub fn shares_declaration(&self, other: &Self, budget: &mut Budget) -> Result<bool> {
+        self.captures_declaration(&other.declaration, budget)
+    }
+
+    /// Additional staged allowance for this immutable correspondence on this ledger.
+    /// Existing checked-record registrations remain enforced by their owning CAS scope.
+    /// This reports a reservation increment, not capacity or a replacement for the
+    /// full logical `retained_bytes()` allowance. Use it before further ledger work.
+    /// # Errors
+    /// Preserves owning-scope refresh, Work and staged-payload failures.
+    pub fn staged_retained_bytes(&self, budget: &mut Budget) -> Result<u64> {
+        let before = budget.limits().staged_payload_bytes;
+        let graph = self.cas.with_retained_graph(budget, |budget| {
+            before
+                .checked_sub(budget.limits().staged_payload_bytes)
+                .ok_or(AdmissionError::ResourceLimit)
+        })?;
+        (size_of::<Self>() as u64)
+            .checked_add(accounting::STORE)
+            .and_then(|bytes| bytes.checked_add(RECEIVING_RC_CONTROL_BYTES))
+            .and_then(|bytes| bytes.checked_add(graph))
+            .ok_or(AdmissionError::ResourceLimit)
+    }
+
     /// New retained correspondence residence, excluding existing original owners.
     #[must_use]
     pub fn retained_bytes(&self) -> u64 {
-        size_of::<Self>() as u64 + accounting::STORE + 16 + self.cas.counts().payload_bytes
+        size_of::<Self>() as u64
+            + accounting::STORE
+            + RECEIVING_RC_CONTROL_BYTES
+            + self.cas.counts().payload_bytes
     }
 }
 

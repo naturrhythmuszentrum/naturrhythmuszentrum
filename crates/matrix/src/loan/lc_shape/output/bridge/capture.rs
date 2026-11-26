@@ -86,14 +86,28 @@ impl Plan {
             add(retained, scratch)? as u64,
             crate::loan::AT,
         )?;
-        let mut permit = heap.preflight_resources(
+        let mut permit = heap.preflight_resources_scoped(
             ResourcePlan {
                 retained,
                 scratch,
                 ..ResourcePlan::default()
             },
             ResourcePolicy::from_budget(budget),
+            Some(old),
         )?;
+        if let Some(gate) = &heap.graph_gate {
+            charge(budget, heap.resource_work()?)?;
+            gate.capture(
+                heap.resource_bytes()?,
+                ResourcePlan {
+                    retained,
+                    scratch,
+                    ..ResourcePlan::default()
+                },
+                old,
+                live,
+            )?;
+        }
         permit.account = Some(account);
         let edges = rows
             .checked_mul(7)
@@ -198,8 +212,16 @@ pub(in crate::loan::lc_shape) fn join_on<P: Scalar + 'static>(
         .retained_bytes()?
         .checked_add(external)
         .ok_or(LoanError::ByteOverflow)?;
+    let staged = if heap.graph_gate.is_some() {
+        let correspondence = &candidate.correspondence;
+        let reserved =
+            correspondence.retained_bytes() - correspondence.staged_retained_bytes(budget)?;
+        live.checked_sub(reserved).ok_or(LoanError::ByteOverflow)?
+    } else {
+        live
+    };
     budget
-        .with_retained_payload(live, crate::loan::AT, |budget| {
+        .with_retained_payload(staged, crate::loan::AT, |budget| {
             allocate(heap, identity, candidate, captured, budget)
         })
         .map_err(LcShapeError::Loan)

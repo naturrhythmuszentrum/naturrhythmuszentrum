@@ -27,7 +27,7 @@ pub(super) fn question(budget: &mut Budget) -> TestResult<LcForwardCover> {
 }
 
 /// Optional energy and repeated L constraints retain their original positional identities.
-pub(super) fn inventory_question(
+pub(in crate::loan) fn inventory_question(
     energy: bool,
     repeated: bool,
     budget: &mut Budget,

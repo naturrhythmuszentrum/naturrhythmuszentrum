@@ -198,10 +198,19 @@ impl Heap {
         plan: ResourcePlan,
         policy: ResourcePolicy,
     ) -> Result<ResourcePermit, HeapError> {
+        self.preflight_resources_scoped(plan, policy, None)
+    }
+    /// Owning-layer overlap distinguishes already resident old buffers from new staging.
+    pub(crate) fn preflight_resources_scoped(
+        &self,
+        plan: ResourcePlan,
+        policy: ResourcePolicy,
+        overlap: Option<usize>,
+    ) -> Result<ResourcePermit, HeapError> {
         self.preflight_elements(plan.elements, plan.retired)?;
         // Heap limits govern aggregate destination elements; per-call byte ceilings govern
         // this call's new owners and its own replacement peak, not unrelated resident owners.
-        self.resource_bytes()?;
+        let native = self.resource_bytes()?;
         // Retained growth counts the new capacity, while scratch includes both old portions
         // of a replacement: delta + old + old equals the simultaneous old and new buffers.
         let retained = plan.retained;
@@ -219,6 +228,9 @@ impl Heap {
                 used: u64::try_from(peak).map_err(|_| HeapError::Capacity)?,
                 limit: policy.staged,
             });
+        }
+        if let Some(gate) = &self.graph_gate {
+            gate.check(native, plan, overlap)?;
         }
         Ok(ResourcePermit {
             scope: self.scope,
@@ -241,6 +253,9 @@ impl Heap {
                 .checked_sub(retired[index])
                 .ok_or(HeapError::Capacity)?;
             if add(retained, elements[index])? > self.limits.elements {
+                if let Some(gate) = &self.graph_gate {
+                    gate.element_failure(legacy, managed, retired, elements, self.limits.elements);
+                }
                 return Err(HeapError::Capacity);
             }
         }

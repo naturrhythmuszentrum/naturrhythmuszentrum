@@ -8,21 +8,30 @@ use std::cell::{Ref, RefMut};
 
 /// Borrowed immutable words carry no acknowledgement or completion authority.
 #[derive(Debug)]
-pub(crate) struct Pull<'a> {
+pub struct Pull<'a> {
     /// Borrow protects the actual evidence backing against replacement.
     words: Ref<'a, Vec<u64>>,
     /// Exact original record authority returned to the caller.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "the borrowed receipt retains its authenticated original locator"
+        )
+    )]
     pub(crate) handle: Handle,
     /// Admitted start and actual byte length.
     range: (usize, usize),
 }
 impl Pull<'_> {
     /// Padded words are immutable; the byte length identifies the lossless prefix.
-    pub(crate) fn words(&self) -> &[u64] {
+    #[must_use]
+    pub fn words(&self) -> &[u64] {
         &self.words[self.range.0..self.range.0 + self.range.1.div_ceil(8)]
     }
     /// Only the final word may contain zero padding.
-    pub(crate) const fn bytes(&self) -> usize {
+    #[must_use]
+    pub const fn bytes(&self) -> usize {
         self.range.1
     }
 }
@@ -32,13 +41,34 @@ pub(crate) struct Prepared<'a> {
     /// Sole graph-side owner stays borrowed until commit or interruption.
     sink: &'a Sink,
     /// Mutable evidence borrow prevents another delivery from stealing this destination.
-    words: RefMut<'a, Vec<u64>>,
+    words: RefMut<'a, [u64]>,
     /// Original destination, with its precomputed next generation.
     handle: Handle,
     /// Exact closed encoding selected before entering the native transition.
     encoding: Encoding,
-    /// Preflighted destination offset, inline in this prepared record.
+    /// Fixed-width native phase selected by the admitted adapter transition.
+    phase: u64,
+}
+/// Checked metadata carries no borrow or obligation until its fixed transaction is acquired.
+#[derive(Clone, Copy, Debug)]
+struct Destination {
+    /// Exact original slot and next nonwrapping generation.
+    handle: Handle,
+    /// Admitted closed scalar encoding.
+    encoding: Encoding,
+    /// Disjoint preallocated evidence range.
     offset: usize,
+}
+impl Destination {
+    /// Existing T/M/I tariff, unchanged for both single and paired destinations.
+    fn prepay(self, budget: &mut nrz_bindings::Budget) -> Result<(), Error> {
+        let count = self.encoding.bytes().div_ceil(8);
+        charge(
+            budget,
+            1 + self.encoding.inspection() + self.encoding.fields() + count + 5,
+        )?;
+        Ok(())
+    }
 }
 impl Sink {
     /// Preflight and prepay before invoking any native operation producing this evidence.
@@ -48,9 +78,89 @@ impl Sink {
         encoding: Encoding,
         account: &mut ExecutionAccount,
     ) -> Result<Prepared<'_>, Error> {
-        account.authenticate(self.backing.account)?;
-        charge(&mut account.ledger, 1)?; // H entry.
-        charge(&mut account.ledger, 1)?; // M fixed stop status, including a prepared update.
+        self.prepare_on(slot, encoding, account.identity, &mut account.ledger)
+    }
+    /// Nested graph phases borrow the identical original ledger without reconstructing an account.
+    pub(crate) fn prepare_on(
+        &self,
+        slot: usize,
+        encoding: Encoding,
+        identity: u64,
+        budget: &mut nrz_bindings::Budget,
+    ) -> Result<Prepared<'_>, Error> {
+        let destination = self.destination(slot, encoding, identity, budget)?;
+        let words = self
+            .backing
+            .words
+            .try_borrow_mut()
+            .map_err(|_| Error::Borrowed)?;
+        destination.prepay(budget)?;
+        let begin = destination.offset;
+        let end = begin + destination.encoding.bytes().div_ceil(8);
+        Ok(self.materialize(
+            destination,
+            RefMut::map(words, |words| &mut words[begin..end]),
+        ))
+    }
+
+    /// A probe and an intact-return destination are funded together before native entry.
+    pub(in crate::loan::graph) fn prepare_pair(
+        &self,
+        first: (usize, Encoding),
+        second: (usize, Encoding),
+        account: &mut ExecutionAccount,
+    ) -> Result<(Prepared<'_>, Prepared<'_>), Error> {
+        let first = self.destination(first.0, first.1, account.identity, &mut account.ledger)?;
+        let second = self.destination(second.0, second.1, account.identity, &mut account.ledger)?;
+        let first_end = first.offset + first.encoding.bytes().div_ceil(8);
+        let second_end = second.offset + second.encoding.bytes().div_ceil(8);
+        let forward = first_end <= second.offset;
+        let backward = second_end <= first.offset;
+        if !forward && !backward {
+            return Err(Error::Full);
+        }
+        let words = self
+            .backing
+            .words
+            .try_borrow_mut()
+            .map_err(|_| Error::Borrowed)?;
+        first.prepay(&mut account.ledger)?;
+        second.prepay(&mut account.ledger)?;
+        let words = RefMut::map(words, Vec::as_mut_slice);
+        let (first_words, second_words) = RefMut::map_split(words, |words| {
+            if forward {
+                let (left, right) = words.split_at_mut(second.offset);
+                (
+                    &mut left[first.offset..first_end],
+                    &mut right[..second_end - second.offset],
+                )
+            } else {
+                let (left, right) = words.split_at_mut(first.offset);
+                (
+                    &mut right[..first_end - first.offset],
+                    &mut left[second.offset..second_end],
+                )
+            }
+        });
+        Ok((
+            self.materialize(first, first_words),
+            self.materialize(second, second_words),
+        ))
+    }
+
+    /// The same fixed inspections precede either a single or paired transaction.
+    fn destination(
+        &self,
+        slot: usize,
+        encoding: Encoding,
+        identity: u64,
+        budget: &mut nrz_bindings::Budget,
+    ) -> Result<Destination, Error> {
+        if identity != self.backing.account {
+            return Err(LoanError::ForeignAccount.into());
+        }
+        charge(budget, 1)?; // H entry.
+        charge(budget, 1)?; // M fixed stop status, including a prepared update.
         if self.backing.status.get() == Status::Overlength {
             return Err(Error::Overlength);
         }
@@ -59,7 +169,7 @@ impl Sink {
             .slots
             .get(slot)
             .ok_or(LoanError::StaleOccupation)?;
-        charge(&mut account.ledger, 6)?; // M state, witnesses, codec, bound, generation, offset.
+        charge(budget, 6)?; // M state, witnesses, codec, bound, generation, offset.
         let (state, witnesses, admitted, bound, current, offset) = (
             record.state.get(),
             record.witnesses.get(),
@@ -91,21 +201,7 @@ impl Sink {
         } else {
             current
         };
-        let words = self
-            .backing
-            .words
-            .try_borrow_mut()
-            .map_err(|_| Error::Borrowed)?;
-        let count = encoding.bytes().div_ceil(8);
-        // T fixed transaction; M source fields; I directly initialized destination words;
-        // M state/generation/length/outstanding/status commit, prepaid before native entry.
-        charge(
-            &mut account.ledger,
-            1 + encoding.inspection() + encoding.fields() + count + 5,
-        )?;
-        Ok(Prepared {
-            sink: self,
-            words,
+        Ok(Destination {
             handle: Handle {
                 owner: self.backing.identity,
                 slot,
@@ -114,6 +210,21 @@ impl Sink {
             encoding,
             offset,
         })
+    }
+
+    /// Construct a fixed transaction after its complete copy/update tariff was prepaid.
+    fn materialize<'a>(
+        &'a self,
+        destination: Destination,
+        words: RefMut<'a, [u64]>,
+    ) -> Prepared<'a> {
+        Prepared {
+            sink: self,
+            words,
+            handle: destination.handle,
+            encoding: destination.encoding,
+            phase: self.backing.slots[destination.handle.slot].position.phase,
+        }
     }
     /// Pull authenticates an outstanding record and borrows its immutable encoded fields.
     pub(crate) fn pull(
@@ -189,14 +300,24 @@ impl Sink {
     }
 }
 impl Prepared<'_> {
+    /// Selecting a native phase changes only its bounded scalar, never owner or node authority.
+    pub(in crate::loan::graph) const fn at_native_state(mut self, phase: u64) -> Self {
+        self.phase = phase;
+        self
+    }
     /// Commit moves no native owner; wrong/overlong evidence returns unchanged to its caller.
     pub(crate) fn commit(mut self, evidence: Evidence) -> Result<Handle, (Evidence, Error)> {
         let record = &self.sink.backing.slots[self.handle.slot];
         let count = self.encoding.bytes().div_ceil(8);
         if let Err(evidence) = evidence.write(
             self.encoding,
-            record.position,
-            &mut self.words[self.offset..self.offset + count],
+            super::codec::Position {
+                owner: record.position.owner,
+                node: record.position.node,
+                generation: record.position.generation,
+                phase: self.phase,
+            },
+            &mut self.words[..count],
         ) {
             return Err((evidence, Error::Unbounded));
         }
@@ -251,6 +372,7 @@ impl Prepared<'_> {
 
 impl Sink {
     /// The fixed destination is funded before a probe can consume its native attempt.
+    #[cfg(test)]
     pub(crate) fn probe<C>(
         &self,
         slot: usize,
@@ -283,6 +405,7 @@ pub(crate) struct Returned<C> {
 
 /// A stopped delivery returns the identical native value without allocating an error box.
 #[derive(Debug)]
+#[cfg(test)]
 pub(crate) struct Delivered<C> {
     /// The sink never retains this native capability or copies its payload.
     pub(crate) capability: C,
@@ -291,6 +414,7 @@ pub(crate) struct Delivered<C> {
 }
 impl Sink {
     /// An overlength or Work stop returns its native capability with no partial evidence.
+    #[cfg(test)]
     pub(crate) fn deliver<C>(
         &self,
         slot: usize,

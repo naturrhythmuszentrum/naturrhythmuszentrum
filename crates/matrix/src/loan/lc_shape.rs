@@ -2,9 +2,14 @@
 //! Original LC input transport retains the checked question and complete tuple roles.
 
 pub(in crate::loan) mod exact_scope;
+pub use exact_scope::{
+    ExactScope as LcGraphOriginalScope, Exclusion as LcGraphOriginalExclusion,
+    Input as LcGraphOriginalInput, Measure as LcGraphOriginalMeasure,
+    Observation as LcGraphOriginalObservation,
+};
 mod inventory;
 mod lifecycle;
-mod output;
+pub(in crate::loan) mod output;
 pub use output::{
     LcOmegaOutput, LcOmegaPrepareFailure, LcOmegaPrepared, LcOutputCellState, LcOutputDeclaration,
     LcOutputPending, LcOutputPublicationError,
@@ -238,7 +243,7 @@ impl<P: Scalar> LcInputShape<P> {
 }
 
 #[cfg(test)]
-mod tests;
+pub(in crate::loan) mod tests;
 
 /// Private bridge layout evidence is shared with the existing native inventory control.
 #[cfg(test)]

@@ -4,10 +4,10 @@
 mod authority;
 mod boundaries;
 mod exact_scope;
-mod fixture;
+pub(in crate::loan) mod fixture;
 mod inventory;
 mod observation;
-mod output;
+pub(in crate::loan) mod output;
 mod refusals;
 mod schema;
 mod scope;

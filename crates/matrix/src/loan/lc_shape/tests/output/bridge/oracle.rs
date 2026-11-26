@@ -148,7 +148,7 @@ pub(super) fn graph() -> u64 {
 }
 
 /// New retained ownership excludes the caller's existing physical original union.
-pub(super) fn retained(replay: bool) -> u64 {
+pub(in crate::loan) fn retained(replay: bool) -> u64 {
     48 + size_of::<nrz_cas::Cas>() as u64
         + 384
         + 16

@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Waiting scans capture a serial watermark and repair their cursor on removal.
 
+#[cfg(test)]
 use super::drive::Capacity;
-use super::{
-    ATTEMPTS, Core, Error, INVALID, NONE, READY, SCANNING, TERMINAL, WAITING, bitmap, enter,
-};
+#[cfg(test)]
+use super::{ATTEMPTS, INVALID, READY, TERMINAL, bitmap};
+use super::{Core, Error, NONE, SCANNING, WAITING, enter};
 use crate::loan::graph::Backing;
 use crate::loan::{ExecutionAccount, LoanError, charge};
+#[cfg(test)]
 use nrz_bindings::Budget;
 
 /// Every entered capacity probe returns its original typed evidence to the bounded caller sink.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[cfg(test)]
 pub(crate) struct ScanReceipt {
     /// Exact occupation attempted, never just a reusable slot number.
     pub(crate) handle: super::Handle,
@@ -34,7 +37,7 @@ impl Core {
                 if backing.control.flags & super::STOPPED != 0 {
                     return Err(Error::WorkStopped);
                 }
-                if backing.control.flags & super::INVALIDATING != 0 {
+                if backing.control.flags & (super::INVALIDATING | super::SCOPING) != 0 {
                     return Err(Error::ControlInProgress);
                 }
                 if backing.control.flags & SCANNING != 0 {
@@ -81,13 +84,25 @@ impl Core {
         super::record_stop(backing, &result);
         result
     }
-    /// Newly appended or reinserted membership cannot extend the captured scan.
+    /// Fixture scans share the production attempt boundary without a delivery owner.
+    #[cfg(test)]
     pub(crate) fn scan_capacity(
         &mut self,
         slice: usize,
         account: &mut ExecutionAccount,
-        mut probe: impl FnMut(usize, &mut Budget) -> Result<Capacity, LoanError>,
-        mut receipt: impl FnMut(ScanReceipt),
+        probe: impl FnMut(usize, &mut Budget) -> Result<Capacity, LoanError>,
+        receipt: impl FnMut(ScanReceipt),
+    ) -> Result<bool, Error> {
+        let mut attempt = super::attempt::Fixture { probe, receipt };
+        self.scan_prepared(slice, account, &mut attempt)
+    }
+    /// Newly appended or reinserted membership cannot extend the captured scan.
+    #[cfg(test)]
+    pub(crate) fn scan_prepared(
+        &mut self,
+        slice: usize,
+        account: &mut ExecutionAccount,
+        attempt: &mut impl super::attempt::Attempt,
     ) -> Result<bool, Error> {
         account.authenticate(self.reservation.backing.account)?;
         let backing =
@@ -99,7 +114,7 @@ impl Core {
                 if backing.control.flags & super::STOPPED != 0 {
                     return Err(Error::WorkStopped);
                 }
-                if backing.control.flags & super::INVALIDATING != 0 {
+                if backing.control.flags & (super::INVALIDATING | super::SCOPING) != 0 {
                     return Err(Error::ControlInProgress);
                 }
                 for _ in 0..slice {
@@ -109,7 +124,7 @@ impl Core {
                     if backing.drive == 0 {
                         return Err(Error::TraversalExhausted);
                     }
-                    scan_one(backing, budget, &mut probe, &mut receipt)?;
+                    scan_one(backing, budget, attempt)?;
                 }
                 Ok(backing.control.flags & SCANNING == 0)
             });
@@ -118,11 +133,11 @@ impl Core {
     }
 }
 /// One bounded scan member is inspected once; a retry consumes its original attempt.
+#[cfg(test)]
 fn scan_one(
     backing: &mut Backing,
     budget: &mut Budget,
-    probe: &mut impl FnMut(usize, &mut Budget) -> Result<Capacity, LoanError>,
-    receipt: &mut impl FnMut(ScanReceipt),
+    attempt: &mut impl super::attempt::Attempt,
 ) -> Result<(), Error> {
     let slot = backing.control.waiting[2];
     if slot == NONE {
@@ -150,17 +165,26 @@ fn scan_one(
     let exhausted = node.attempts == 0;
     // Fund the fixed cursor save before entering a probe; no fresh attempt is fabricated.
     charge(budget, 1)?;
+    attempt.prepare(
+        super::Handle {
+            owner: backing.identity,
+            slot,
+            generation: node.generation,
+        },
+        exhausted,
+        budget,
+    )?;
     enter(backing)?;
     let capacity = if exhausted {
         None
     } else {
         backing.nodes[slot].attempts -= 1;
         backing.nodes[slot].epochs[2] = backing.control.epochs[3];
-        Some(probe(slot, budget)?)
+        Some(attempt.probe(slot, budget)?)
     };
     // Return evidence before any subsequent graph debit can refuse; no receipt is lost
     // on a later commit failure. The caller supplies its bounded evidence destination.
-    receipt(ScanReceipt {
+    attempt.receipt(ScanReceipt {
         handle: super::Handle {
             owner: backing.identity,
             slot,

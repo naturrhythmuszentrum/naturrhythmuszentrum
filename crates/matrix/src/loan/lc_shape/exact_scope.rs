@@ -2,21 +2,13 @@
 //! Borrowed exact-owner observations are not another physical reservation.
 //! No aggregate total is exposed: the named exclusions have no capacity inventory.
 
-#![cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the later graph adapter consumes this private report"
-    )
-)]
-
 use super::{LcInputInventory, LcInputShape};
 use nrz_bindings::{LcForwardCover, LcRelation, Registry};
 use nrz_scalar::Scalar;
 
 /// An original scope for which complete backing capacity is unavailable.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum Exclusion {
+pub enum Exclusion {
     /// Original symbolic stores, beyond their existing logical allowances.
     SymbolicStores,
     /// Original exact provenance and its retained dependencies.
@@ -49,17 +41,17 @@ const EXCLUSIONS: [Exclusion; 8] = [
 
 /// Distinct units must not be added into a purported complete physical total.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct Measure {
+pub struct Measure {
     /// Existing owning-layer conservative logical retained allowance, when available.
-    pub(crate) logical_allowance_bytes: Option<u64>,
+    pub logical_allowance_bytes: Option<u64>,
     /// Size in bytes of the borrowed Rust record only, not its transitive backing allocations.
     /// An inventory contains its schema records. Question/relation sizes are per-use Rc
     /// handle sizes: the question handle lies in its schema, and the relation handle in
     /// the cover's shared allocation. These observations overlap their containing owners.
     /// Deduplicating shared-allocation identity does not deduplicate per-use handles.
-    pub(crate) inline_record_size: usize,
+    pub inline_record_size: usize,
     /// Complete physical backing capacity is unavailable for all these original scopes.
-    pub(crate) backing_capacity_bytes: Option<usize>,
+    pub backing_capacity_bytes: Option<usize>,
 }
 
 /// A live identity witness; no raw address escapes and no original owner is cloned.
@@ -83,16 +75,17 @@ enum Owner<'i, P: Scalar, const N: usize> {
 
 /// One scoped observation keeps its identity valid for the original borrow lifetime.
 #[derive(Debug)]
-pub(crate) struct Observation<'i, P: Scalar, const N: usize> {
+pub struct Observation<'i, P: Scalar, const N: usize> {
     /// Opaque identity distinguishes sharing from equal contents.
     owner: Owner<'i, P, N>,
     /// Separately named units; None means unavailable, never zero.
-    pub(crate) measure: Measure,
+    pub measure: Measure,
 }
 impl<P: Scalar, const N: usize> Observation<'_, P, N> {
     /// Compare only the same owner kind, using original owning-layer identity interfaces.
     /// This is a fixed read-only comparison, not an allocation or a reservation handoff.
-    pub(crate) fn same_owner(&self, other: &Self) -> bool {
+    #[must_use]
+    pub fn same_owner(&self, other: &Self) -> bool {
         match (&self.owner, &other.owner) {
             (Owner::Inventory(left), Owner::Inventory(right)) => std::ptr::eq(*left, *right),
             (Owner::Schema(left), Owner::Schema(right)) => std::ptr::eq(*left, *right),
@@ -106,15 +99,15 @@ impl<P: Scalar, const N: usize> Observation<'_, P, N> {
 
 /// Every positional use remains discoverable even when its question/relation is shared.
 #[derive(Debug)]
-pub(crate) struct Input<'i, P: Scalar, const N: usize> {
+pub struct Input<'i, P: Scalar, const N: usize> {
     /// Original supplied-constraint index, not an index after deduplication.
-    pub(crate) position: usize,
+    pub position: usize,
     /// Inline schema and its unmeasured symbol/provenance dependencies.
-    pub(crate) schema: Observation<'i, P, N>,
+    pub schema: Observation<'i, P, N>,
     /// New forward-cover logical allowance excludes the shared original relation.
-    pub(crate) question: Observation<'i, P, N>,
+    pub question: Observation<'i, P, N>,
     /// Original relation logical allowance remains separate from the forward cover.
-    pub(crate) relation: Observation<'i, P, N>,
+    pub relation: Observation<'i, P, N>,
 }
 
 /// Allocation-free view of the caller's originals beside, never inside, the physical plan.
@@ -124,7 +117,7 @@ pub(crate) struct Input<'i, P: Scalar, const N: usize> {
 /// A later graph traversal retains its own record-visit charges. Borrowing this view adds
 /// no retaining edge, capacity or cleanup obligation. No complete total is available.
 #[derive(Debug)]
-pub(crate) struct ExactScope<'i, P: Scalar, const N: usize> {
+pub struct ExactScope<'i, P: Scalar, const N: usize> {
     /// The caller keeps every schema and its shared exact authority alive for this borrow.
     inventory: &'i LcInputInventory<P, N>,
     /// The semantic Registry is borrowed for that same lifetime, never reconstructed.
@@ -140,17 +133,20 @@ impl<'i, P: Scalar, const N: usize> ExactScope<'i, P, N> {
     }
 
     /// Named unavailable scopes belong to this report, not a separately imported inventory.
-    pub(crate) const fn exclusions() -> [Exclusion; 8] {
+    #[must_use]
+    pub const fn exclusions() -> [Exclusion; 8] {
         EXCLUSIONS
     }
 
     /// Finite positional enumeration uses the original fixed inventory extent.
-    pub(crate) const fn input_count() -> usize {
+    #[must_use]
+    pub const fn input_count() -> usize {
         N
     }
 
     /// The complete inline array is one borrowed record, with unknown symbolic backing.
-    pub(crate) const fn inventory(&self) -> Observation<'i, P, N> {
+    #[must_use]
+    pub const fn inventory(&self) -> Observation<'i, P, N> {
         Observation {
             owner: Owner::Inventory(self.inventory),
             measure: measure(self.inventory, None),
@@ -158,7 +154,8 @@ impl<'i, P: Scalar, const N: usize> ExactScope<'i, P, N> {
     }
 
     /// Object/header observation does not count any Registry child as physically covered.
-    pub(crate) const fn registry(&self) -> Observation<'i, P, N> {
+    #[must_use]
+    pub const fn registry(&self) -> Observation<'i, P, N> {
         Observation {
             owner: Owner::Registry(self.registry),
             measure: measure(self.registry, None),
@@ -166,7 +163,8 @@ impl<'i, P: Scalar, const N: usize> ExactScope<'i, P, N> {
     }
 
     /// Return one original use; out-of-range does not fabricate an empty owner.
-    pub(crate) fn input(&self, index: usize) -> Option<Input<'i, P, N>> {
+    #[must_use]
+    pub fn input(&self, index: usize) -> Option<Input<'i, P, N>> {
         let schema = self.inventory.input(index)?;
         let question = schema.question();
         let relation = question.relation();

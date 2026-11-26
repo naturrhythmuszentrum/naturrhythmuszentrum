@@ -115,19 +115,15 @@ pub(in crate::loan::lc_shape) fn retained_overlap<P: Scalar, const N: usize>(
     expected: [u64; 2],
     account: &mut ExecutionAccount,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use super::retained_overlap::{Candidate, EXCLUSIONS, Exclusion, Observation, Scope};
+    use super::retained_overlap::{Candidate, Observation, Scope};
     use nrz_bindings::{Budget, LcOmegaCorrespondence, Limits};
-    assert_eq!(
-        EXCLUSIONS,
-        [
-            Exclusion::OriginalBaseline,
-            Exclusion::NativeClosureFacadeAndTables,
-            Exclusion::CasBackendCapacity,
-            Exclusion::PrivateCheckedRecordRegistrations,
-            Exclusion::ExternalCanonicalKeyAndProofCopies,
-        ]
-    );
+    exclusions();
+    empty_certificate(account)?;
     let root = prepare_lc_omega_correspondence(output, registry, None, account)?;
+    let captured = Observation::captured(&root.correspondence)?;
+    assert_eq!(captured.logical_allowance, Some(416));
+    assert!(captured.same_allocation(&Observation::token(&root.token)?, &mut account.ledger)?);
+    assert!(captured.same_allocation(&captured, &mut account.ledger)?);
     let before = account.usage();
     let report = Candidate::new(&root)?;
     assert_eq!(account.usage(), before);
@@ -217,6 +213,21 @@ pub(in crate::loan::lc_shape) fn retained_overlap<P: Scalar, const N: usize>(
     let exhausted_refused = refusal.is_err();
     assert!(exhausted_refused);
     retained_handoffs([&root, &replay], account)
+}
+
+/// The known projection preserves the complete named unavailable scope list.
+fn exclusions() {
+    use super::retained_overlap::{EXCLUSIONS, Exclusion};
+    assert_eq!(
+        EXCLUSIONS,
+        [
+            Exclusion::OriginalBaseline,
+            Exclusion::NativeClosureFacadeAndTables,
+            Exclusion::CasBackendCapacity,
+            Exclusion::PrivateCheckedRecordRegistrations,
+            Exclusion::ExternalCanonicalKeyAndProofCopies,
+        ]
+    );
 }
 
 /// Exact helper reservations reject a duplicate correspondence debit at the tight ceiling.
@@ -415,4 +426,17 @@ pub(in crate::loan::lc_shape) fn retained_timeline_prepare<
         correspondence,
         receipt,
     })
+}
+
+/// A zero-capacity untrusted certificate has an inline record but no shared buffer identity.
+fn empty_certificate(account: &mut ExecutionAccount) -> Result<(), Box<dyn std::error::Error>> {
+    use super::retained_overlap::Observation;
+    use nrz_bindings::readings::algebra::enclosure::lc_root::Certificate;
+    let first = Certificate::from_bytes(&[], &mut account.ledger)?;
+    let second = Certificate::from_bytes(&[], &mut account.ledger)?;
+    let observation = Observation::certificate(&first);
+    assert_eq!(observation.observed_residence, Some(24));
+    assert!(observation.same_allocation(&Observation::certificate(&first), &mut account.ledger)?);
+    assert!(!observation.same_allocation(&Observation::certificate(&second), &mut account.ledger)?);
+    Ok(())
 }

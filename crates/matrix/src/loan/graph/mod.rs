@@ -1,20 +1,28 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Non-executable scoped storage precedes graph validation and publication.
-//! Uncovered authority/backend and delivery rows never become a complete total.
+//! Bounded storage, validated readiness and scoped native graph composition.
+//! Uncovered authority/backend rows and external delivery never become a complete total.
 
-#![cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the adapter increment wires the crate-private graph core"
-    )
-)]
-
+pub(crate) mod adapter;
 mod inventory;
 mod plan;
 mod records;
 mod reserve;
 pub(in crate::loan) mod sink;
+pub use adapter::{
+    LcGraphAdmissionFailure, LcGraphBorrowed, LcGraphCapacities, LcGraphCompletion, LcGraphEvent,
+    LcGraphExactChildren, LcGraphInputRequest, LcGraphInputReturn, LcGraphMapping,
+    LcGraphNativeFailure, LcGraphNativeResidence, LcGraphNode, LcGraphOwner, LcGraphOwnerSet,
+    LcGraphScope, LcGraphScopeProgress, LcGraphSnapshot, LcGraphState,
+};
+pub use inventory::Row as LcGraphInventoryRow;
+pub use sink::Error as LcGraphEvidenceError;
+pub use sink::Handle as LcGraphEvidenceHandle;
+pub use sink::Status as LcGraphDeliveryStatus;
+pub use sink::delivery::Pull as LcGraphEvidencePull;
+pub use sink::witness::Witness as LcGraphWitness;
+pub use walk::Error as LcGraphError;
+pub use walk::Handle as LcGraphHandle;
+
 #[cfg(test)]
 mod tests;
 mod walk;
@@ -34,6 +42,7 @@ pub(crate) struct Reservation {
 }
 /// An outside inspector retains exactly the same covered allocation set.
 #[derive(Debug)]
+#[cfg(test)]
 pub(crate) struct Reader {
     /// Last inspector keeps reservation storage resident after the constructor drops.
     backing: Rc<Backing>,
@@ -43,6 +52,7 @@ pub(crate) struct Reader {
 pub(crate) struct Borrowed<'a>(&'a Backing);
 /// Inspectable reservation slot; no constructor outside this module supplies authority.
 #[derive(Clone, Copy, Debug)]
+#[cfg(test)]
 pub(crate) struct Handle {
     /// Original reservation identity.
     owner: u64,
@@ -53,6 +63,7 @@ pub(crate) struct Handle {
 }
 /// Read-only facts about a reserved node, not a mutable graph record.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[cfg(test)]
 pub(crate) struct Slot {
     /// Initial original attempt envelope, not consumed by inspection.
     pub(crate) attempts: u64,
@@ -98,6 +109,7 @@ impl Reservation {
         Borrowed(&self.backing)
     }
     /// Retain an outside inspection edge; the edge cleanup is paid before cloning.
+    #[cfg(test)]
     pub(crate) fn reader(&self, account: &mut ExecutionAccount) -> Result<Reader, LoanError> {
         account.authenticate(self.backing.account)?;
         account
@@ -111,6 +123,7 @@ impl Reservation {
             })
     }
     /// Inspect only a proposed reservation slot, without activation or numerical authority.
+    #[cfg(test)]
     pub(crate) fn handle(
         &self,
         slot: usize,
@@ -136,6 +149,7 @@ impl Reservation {
             })
     }
     /// Authentication failure leaves the owner and every original slot untouched.
+    #[cfg(test)]
     pub(crate) fn inspect(
         &self,
         handle: Handle,
@@ -168,6 +182,7 @@ impl Reservation {
             })
     }
 }
+#[cfg(test)]
 impl Reader {
     /// Include storage retained only by an outside reader in the scoped inventory.
     pub(crate) fn borrowed(&self) -> Borrowed<'_> {

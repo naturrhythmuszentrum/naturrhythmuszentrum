@@ -24,7 +24,7 @@ impl Core {
                     if backing.control.flags & super::STOPPED != 0 {
                         return Err(Error::WorkStopped);
                     }
-                    if backing.control.flags & INVALIDATING != 0 {
+                    if backing.control.flags & (INVALIDATING | super::SCOPING) != 0 {
                         return Err(Error::ControlInProgress);
                     }
                     charge(budget, 1)?; // A standalone admitted-owner comparison.
