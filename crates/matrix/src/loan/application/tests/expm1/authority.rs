@@ -72,7 +72,11 @@ fn prepared_historical_origin_authentication_before_payload_load() -> TestResult
             .and_then(|owner| owner.payload.as_mut())
             .ok_or("unique bundle")?;
         match substitution {
-            0 => bundle.retained_law = Some(attachment),
+            0 => {
+                bundle.retained_law = Some(Box::new(
+                    crate::loan::retained_law::RetainedLawAttachment::wrap_expm1(attachment),
+                ));
+            }
             1 => bundle.endpoints.as_mut().ok_or("pair")?.swap(0, 1),
             2 => {
                 let [lower, upper] = bundle.endpoints.as_mut().ok_or("pair")?;

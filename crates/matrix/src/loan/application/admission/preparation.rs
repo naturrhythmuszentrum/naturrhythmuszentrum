@@ -89,6 +89,15 @@ pub(super) fn prepare<P: Scalar + 'static>(
     } = records(identity, descriptors, layouts, masks, &mut guard)?;
     retain_constants(heap, &plan, &mut debits)?;
     let declaration = declaration(request.destination);
+    let retained_law = if plan.attachment_bytes != 0 {
+        #[cfg(test)]
+        crate::loan::fault::before()?;
+        let shell = Box::new(crate::loan::retained_law::RetainedLawAttachment::empty());
+        guard.acquired(false)?;
+        Some(shell)
+    } else {
+        None
+    };
     #[cfg(test)]
     crate::loan::fault::before()?;
     let mut core = Box::new(ApplicationCore {
@@ -102,7 +111,7 @@ pub(super) fn prepare<P: Scalar + 'static>(
         population: extra.population,
         candidate: false,
         host: crate::loan::lifecycle::HostCore {
-            retained_law: None,
+            retained_law,
             identity,
             declaration,
             channels: reading_channels,
@@ -654,7 +663,7 @@ fn shells<P: Scalar>(
     })
 }
 
-/// Each private shell has one exact allocation debit before its owner can escape.
+/// Each private shell has an exact accounting debit before escape; the bundle debit includes its co-owned retained-law attachment.
 fn header_tokens(
     identity: Identity,
     plan: &Plan,
@@ -692,7 +701,7 @@ fn header_tokens(
             identity,
             AllocationKind::Owner,
             0,
-            plan.headers[3],
+            crate::heap::resources::add(plan.headers[3], plan.attachment_bytes)?,
             debits,
             &plan.debit_slots,
             &plan.identities,

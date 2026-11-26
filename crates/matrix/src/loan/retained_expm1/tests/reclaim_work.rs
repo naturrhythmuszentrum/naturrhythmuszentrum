@@ -82,7 +82,7 @@ fn reclaim_boundary(complete: bool, short: u64) -> TestResult {
     let limits = account.limits().clone();
     let law = fixture::prepare(&mut heap, &mut account)?;
     let mut loan = host(&mut heap, &mut account)?;
-    attach(&heap, &mut loan, law, &mut account)?;
+    attach(&mut heap, &mut loan, law, &mut account)?;
     let (tile, receipt) = publish(&mut heap, loan, &mut account)?;
     let root = receipt.ticket().identity.root;
     drop(tile);

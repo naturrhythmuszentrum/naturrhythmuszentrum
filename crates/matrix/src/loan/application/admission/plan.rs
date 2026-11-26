@@ -43,6 +43,8 @@ pub(super) struct Plan {
     pub(super) extras: [usize; 3],
     /// Additional boxed right correspondence, absent for every unary member.
     pub(super) side_bytes: usize,
+    /// Separately allocated closed-law shell, covered by the bundle debit.
+    pub(super) attachment_bytes: usize,
     /// Present native channels.
     pub(super) present: [bool; 3],
     /// Present channel count.
@@ -59,7 +61,7 @@ pub(super) struct Plan {
     pub(super) rounded: usize,
     /// Full detached core and private shared-owner headers.
     pub(super) headers: [usize; 5],
-    /// Number of individual allocation debit records.
+    /// Number of accounting debit records, including the bundle's co-owned attachment.
     pub(super) debit_count: usize,
     /// Fixed indexed debit destinations.
     pub(super) debit_slots: [usize; 23],
@@ -98,6 +100,10 @@ fn prepay_slot_scans(heap: &Heap, budget: &mut nrz_bindings::Budget) -> Result<(
 
 impl Plan {
     /// Authenticate inventory and prepay every acquisition/failure prefix on the original ledger.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the complete application inventory and its checked charges remain together"
+    )]
     pub(super) fn new<P: Scalar + 'static>(
         heap: &Heap,
         request: &super::super::prepared::Request<'_, P>,
@@ -118,6 +124,11 @@ impl Plan {
             rounded: slab_bytes::<P>(length)?,
         };
         let member = request.member()?;
+        let attachment_bytes = if member.is_prepared() {
+            size_of::<crate::loan::retained_law::RetainedLawAttachment>()
+        } else {
+            0
+        };
         let prelude = match &member.law().recipe {
             crate::kernels::contract::Recipe::ProjectedAffine(affine) => Some(&affine.prelude),
             _ => None,
@@ -149,6 +160,7 @@ impl Plan {
                 + usize::from(member.is_binary())
                 + usize::from(geometry.cell_words != 0)
                 + usize::from(declaration.capacity() != 0)
+                + usize::from(attachment_bytes != 0)
                 + geometry.replacements(heap, group_capacity, debit_capacity, pin_capacity)?,
             records: channels + debit_count + 6,
             // Destination symbol handles and common owners; input declaration handles,
@@ -176,6 +188,7 @@ impl Plan {
                 peak: 0,
             },
             extras,
+            attachment_bytes,
             side_bytes: if member.is_binary() {
                 size_of::<super::super::binary::Side>()
             } else {
@@ -251,6 +264,7 @@ impl Plan {
             initialization,
             add(mask_work, request.destination.capacity())?,
         )?;
+        let initialization = add(initialization, usize::from(self.attachment_bytes != 0))?;
         let slots = add(
             heap.descriptors.slots.scan_work(),
             add(heap.masks.layouts.scan_work(), heap.masks.masks.scan_work())?,
@@ -283,6 +297,7 @@ impl Plan {
         )?;
         retained = add(retained, self.extras.into_iter().try_fold(0_usize, add)?)?;
         retained = add(retained, self.side_bytes)?;
+        retained = add(retained, self.attachment_bytes)?;
         for owner in self.constants.iter().flatten() {
             retained = add(retained, owner.bytes)?;
         }

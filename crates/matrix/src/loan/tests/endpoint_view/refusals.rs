@@ -51,7 +51,11 @@ fn attached<P: Scalar + 'static>() -> TestResult {
     for role in HostChannel::ALL {
         loan.write_component(role, 0, 0, P::ONE, &mut account)?;
     }
-    loan.core.retained_law = Some(laws::attach(law, &heap, &mut account)?);
+    let attachment = laws::attach(law, &heap, &mut account)?;
+    crate::loan::retained_law::RetainedLawAttachment::account_fixture(&mut heap, &mut loan.core)?;
+    loan.core.retained_law = Some(Box::new(
+        crate::loan::retained_law::RetainedLawAttachment::wrap_expm1(attachment),
+    ));
     let (tile, receipt) = match heap.handback(loan, &mut account) {
         HandbackOutcome::Published(tile, receipt) => (tile, receipt),
         other => return Err(format!("{other:?}").into()),

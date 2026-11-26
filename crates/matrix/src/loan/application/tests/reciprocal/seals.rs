@@ -232,7 +232,9 @@ fn reciprocal_refuses_prepared_operation_overlay() -> TestResult {
         if publish {
             owner = candidate(owner, &mut setup.account)?;
         }
-        owner.core.host.retained_law = Some(attachment);
+        owner.core.host.retained_law = Some(Box::new(
+            crate::loan::retained_law::RetainedLawAttachment::wrap_expm1(attachment),
+        ));
         owner.core.evidence.prepared = Some(prepared.request.operation);
         fault::reset_reads();
         fault::reset_scalars();

@@ -40,6 +40,7 @@ mod reader;
 mod registry;
 mod retained_dyadic_power;
 mod retained_expm1;
+mod retained_law;
 mod scans;
 
 pub use graph::{

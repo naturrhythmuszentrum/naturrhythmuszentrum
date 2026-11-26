@@ -63,11 +63,24 @@ struct Operation {
     /// Admitted target.
     bits: u32,
 }
-/// The optional attachment remains one already funded pointer.
+/// The concrete expm1 use retains one already funded pointer.
 #[repr(C)]
 struct Attachment {
     /// Shared use record.
     law: Rc<()>,
+}
+/// The closed law mirror carries its C discriminant and aligned use payload.
+#[repr(C)]
+#[expect(dead_code, reason = "the ABI mirror does not construct a law")]
+enum RetainedLaw {
+    /// One concrete funded expm1 use.
+    Expm1(Attachment),
+}
+/// A separate allocation is empty only within private preparation.
+#[repr(C)]
+struct RetainedLawAttachment {
+    /// Closed optional law and its own discriminant.
+    law: Option<RetainedLaw>,
 }
 /// Every immutable outcome has an inline, lossless first refusal.
 #[expect(
@@ -136,7 +149,7 @@ struct PublishedChannel {
 #[repr(C)]
 struct Bundle {
     /// One funded law edge.
-    law: Option<Attachment>,
+    law: Option<Box<RetainedLawAttachment>>,
     /// Host absence or application completion evidence.
     origin: Option<Evidence>,
     /// Result symbolic declaration.
@@ -168,7 +181,7 @@ struct BundleOwner {
 #[repr(C)]
 struct Host {
     /// Funded law edge; host requests leave it absent.
-    law: Option<Attachment>,
+    law: Option<Box<RetainedLawAttachment>>,
     /// Managed identity.
     identity: Identity,
     /// Immutable declaration.
@@ -262,6 +275,10 @@ pub(super) const fn bundle_header() -> usize {
 pub(super) const fn host_header() -> usize {
     size_of::<Host>()
 }
+/// Separately allocated closed-law shell width, derived without its production type.
+pub(super) const fn retained_law_attachment_bytes() -> usize {
+    size_of::<RetainedLawAttachment>()
+}
 /// Complete application header inventory includes the one-element extent allocation once.
 pub(super) const fn application_headers<P: Scalar>() -> usize {
     size_of::<Core<P>>()
@@ -297,6 +314,56 @@ fn prepared_application_independent_abi_layouts() {
     // The local seal has 16-byte inputs, a 24-byte extent, a two-byte kind,
     // six alignment bytes and eight Work bytes: 56 instead of the former 128.
     assert_eq!(size_of::<CellContract>(), 56);
+    assert_eq!(
+        [
+            size_of::<Operation>(),
+            size_of::<Evidence>(),
+            size_of::<Bundle>(),
+            size_of::<Core<f64>>(),
+            outcome_width(),
+            group_row(),
+            bundle_header(),
+            application_headers::<f64>()
+        ],
+        [208, 1664, 3200, 3224, 32, 1032, 3216, 7040]
+    );
+}
+
+/// Independent tag, union and shell mirrors fix the separate attachment and inline slot layouts.
+/// ´test:unit:retained-law-attachment-abi-layout´
+#[test]
+fn retained_law_attachment_abi_layout() {
+    use std::mem::{align_of, size_of};
+    let pointer = size_of::<*const ()>();
+    let tag = size_of::<std::ffi::c_int>();
+    let payload_offset = tag.next_multiple_of(align_of::<Attachment>());
+    let enum_alignment = align_of::<std::ffi::c_int>().max(align_of::<Attachment>());
+    let derived_enum = (payload_offset + size_of::<Attachment>()).next_multiple_of(enum_alignment);
+    assert_eq!(size_of::<Attachment>(), pointer);
+    assert_eq!(size_of::<RetainedLaw>(), derived_enum);
+    assert_eq!(align_of::<RetainedLaw>(), enum_alignment);
+    // The absent law fits an unused encoding, so the optional enum adds no width.
+    assert_eq!(size_of::<Option<RetainedLaw>>(), derived_enum);
+    assert_eq!(size_of::<RetainedLawAttachment>(), derived_enum);
+    assert_eq!(align_of::<RetainedLawAttachment>(), enum_alignment);
+    assert_eq!(retained_law_attachment_bytes(), 16);
+    assert_eq!(
+        size_of::<RetainedLawAttachment>(),
+        size_of::<super::retained_law::RetainedLawAttachment>()
+    );
+    assert_eq!(
+        align_of::<RetainedLawAttachment>(),
+        align_of::<super::retained_law::RetainedLawAttachment>()
+    );
+    let shell = Box::new(super::retained_law::RetainedLawAttachment::empty());
+    let allocation = std::alloc::Layout::for_value(shell.as_ref());
+    assert_eq!(allocation.size(), retained_law_attachment_bytes());
+    assert_eq!(allocation.align(), align_of::<RetainedLawAttachment>());
+    assert_eq!(size_of::<Option<Box<RetainedLawAttachment>>>(), 8);
+    assert_eq!(
+        align_of::<Option<Box<RetainedLawAttachment>>>(),
+        align_of::<*const ()>()
+    );
     assert_eq!(
         [
             size_of::<Operation>(),

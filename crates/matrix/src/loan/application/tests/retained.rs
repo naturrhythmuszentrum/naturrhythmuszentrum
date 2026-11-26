@@ -24,7 +24,14 @@ fn retained_law_application_states_and_source_release() -> TestResult {
             .retained_expm1_inventory(&moved, &mut account)?
             .use_identity;
         let mut owner = ready(heap.request_pointwise_square(request, &mut account))?;
-        owner.core.host.retained_law = Some(laws::attach(moved, &heap, &mut account)?);
+        let attachment = laws::attach(moved, &heap, &mut account)?;
+        crate::loan::retained_law::RetainedLawAttachment::account_fixture(
+            &mut heap,
+            &mut owner.core.host,
+        )?;
+        owner.core.host.retained_law = Some(Box::new(
+            crate::loan::retained_law::RetainedLawAttachment::wrap_expm1(attachment),
+        ));
         heap.retire_mask(demand, &mut account.ledger)?;
         drop(external);
         if state != 0 {
@@ -42,7 +49,13 @@ fn retained_law_application_states_and_source_release() -> TestResult {
             drop(injection);
         }
         laws::check_attachment(
-            owner.core.host.retained_law.as_ref().ok_or("law")?,
+            owner
+                .core
+                .host
+                .retained_law
+                .as_ref()
+                .ok_or("law")?
+                .expm1()?,
             identity,
         )?;
         assert!(matches!(
@@ -83,7 +96,14 @@ fn retained_law_result_outlives_numerical_source() -> TestResult {
         .retained_expm1_inventory(&moved, &mut account)?
         .use_identity;
     let mut owner = ready(heap.request_pointwise_square(request, &mut account))?;
-    owner.core.host.retained_law = Some(laws::attach(moved, &heap, &mut account)?);
+    let attachment = laws::attach(moved, &heap, &mut account)?;
+    crate::loan::retained_law::RetainedLawAttachment::account_fixture(
+        &mut heap,
+        &mut owner.core.host,
+    )?;
+    owner.core.host.retained_law = Some(Box::new(
+        crate::loan::retained_law::RetainedLawAttachment::wrap_expm1(attachment),
+    ));
     heap.retire_mask(demand, &mut account.ledger)?;
     let (tile, receipt) =
         published(heap.publish_application(candidate(owner, &mut account)?, &mut account))?;
@@ -107,7 +127,10 @@ fn retained_law_result_outlives_numerical_source() -> TestResult {
         .as_ref()
         .and_then(|pin| pin.bundle.payload.as_ref())
         .ok_or("bundle")?;
-    laws::check_attachment(bundle.retained_law.as_ref().ok_or("law")?, identity)?;
+    laws::check_attachment(
+        bundle.retained_law.as_ref().ok_or("law")?.expm1()?,
+        identity,
+    )?;
     assert_eq!(
         pin.historical_reader(&mut account)?.read_component(
             HostChannel::Center,
@@ -126,7 +149,10 @@ fn retained_law_result_outlives_numerical_source() -> TestResult {
         .as_ref()
         .and_then(|pin| pin.bundle.payload.as_ref())
         .ok_or("bundle")?;
-    laws::check_attachment(bundle.retained_law.as_ref().ok_or("law")?, identity)?;
+    laws::check_attachment(
+        bundle.retained_law.as_ref().ok_or("law")?.expm1()?,
+        identity,
+    )?;
     Ok(())
 }
 
@@ -145,7 +171,14 @@ fn retained_law_application_drop_and_unwind() -> TestResult {
                 .retained_expm1_inventory(&moved, &mut account)?
                 .use_identity;
             let mut owner = ready(heap.request_pointwise_square(request, &mut account))?;
-            owner.core.host.retained_law = Some(laws::attach(moved, &heap, &mut account)?);
+            let attachment = laws::attach(moved, &heap, &mut account)?;
+            crate::loan::retained_law::RetainedLawAttachment::account_fixture(
+                &mut heap,
+                &mut owner.core.host,
+            )?;
+            owner.core.host.retained_law = Some(Box::new(
+                crate::loan::retained_law::RetainedLawAttachment::wrap_expm1(attachment),
+            ));
             if state != 0 {
                 owner = candidate(owner, &mut account)?;
             }
@@ -161,7 +194,13 @@ fn retained_law_application_drop_and_unwind() -> TestResult {
             drop(heap);
             assert_eq!(laws::destroyed(), destroyed);
             laws::check_attachment(
-                owner.core.host.retained_law.as_ref().ok_or("law")?,
+                owner
+                    .core
+                    .host
+                    .retained_law
+                    .as_ref()
+                    .ok_or("law")?
+                    .expm1()?,
                 identity,
             )?;
             let work = account.usage().work;
