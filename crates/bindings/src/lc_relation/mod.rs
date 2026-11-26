@@ -74,7 +74,9 @@ mod shared;
 mod storage;
 mod witness;
 
-pub use forward::{LcCertainty, LcDeterminacy, LcForwardArc, LcForwardCover, LcPhaseEndpoint};
+pub use forward::{
+    LcBoxForwardCover, LcCertainty, LcDeterminacy, LcForwardArc, LcForwardCover, LcPhaseEndpoint,
+};
 pub use interval::LcInterval;
 pub use pairs::{
     LcAliasCover, LcAliasLattice, LcAliasWitness, LcConsistency, LcFreeDirection, LcPairParameters,

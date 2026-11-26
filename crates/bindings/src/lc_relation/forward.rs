@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Complete floor-cell images of the supported positive independent LC rectangle.
 
+mod box_coverage;
 mod rectangle;
+pub use box_coverage::LcBoxForwardCover;
 
 use super::{AT, LcInput, LcQuantity, LcRelation, LcRelationError, LcValues, LcWitness, storage};
 use crate::{Budget, ExactConstant};

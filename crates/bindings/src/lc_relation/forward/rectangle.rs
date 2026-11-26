@@ -28,26 +28,16 @@ impl Rectangle {
         relation: &LcRelation,
         budget: &mut Budget,
     ) -> Result<Self, LcRelationError> {
-        budget.work(1, AT)?;
-        if relation.observations() != 0 {
-            return Err(LcRelationError::Projection);
-        }
-        let mut slots: [Option<[Rational; 2]>; 4] = [None, None, None, None];
-        for input in relation.inputs() {
-            budget.work(1, AT)?;
-            let slot = match input.quantity() {
-                LcQuantity::Inductance => 0,
-                LcQuantity::Capacitance => 1,
-                LcQuantity::InitialPhase => 2,
-                LcQuantity::Energy => 3,
-                _ => return Err(LcRelationError::Projection),
-            };
-            let next = bounds(input.interval(), budget)?;
-            slots[slot] = Some(match slots[slot].take() {
-                Some(previous) => intersect(previous, &next, budget)?,
-                None => next,
-            });
-        }
+        let slots = collect_slots(
+            relation,
+            [
+                LcQuantity::Inductance,
+                LcQuantity::Capacitance,
+                LcQuantity::InitialPhase,
+                LcQuantity::Energy,
+            ],
+            budget,
+        )?;
         let [inductance, capacitance, phase, energy] = slots;
         let inductance = inductance.ok_or(LcRelationError::Projection)?;
         let capacitance = capacitance.ok_or(LcRelationError::Projection)?;
@@ -143,6 +133,32 @@ impl Rectangle {
     }
 }
 
+/// Collect all permitted roles, intersecting every repeated original declaration.
+pub(super) fn collect_slots<const N: usize>(
+    relation: &LcRelation,
+    accepted: [LcQuantity; N],
+    budget: &mut Budget,
+) -> Result<[Option<[Rational; 2]>; N], LcRelationError> {
+    budget.work(1, AT)?;
+    if relation.observations() != 0 {
+        return Err(LcRelationError::Projection);
+    }
+    let mut slots: [Option<[Rational; 2]>; N] = std::array::from_fn(|_| None);
+    for input in relation.inputs() {
+        budget.work(1, AT)?;
+        let slot = accepted
+            .iter()
+            .position(|role| *role == input.quantity())
+            .ok_or(LcRelationError::Projection)?;
+        let next = bounds(input.interval(), budget)?;
+        slots[slot] = Some(match slots[slot].take() {
+            Some(previous) => intersect(previous, &next, budget)?,
+            None => next,
+        });
+    }
+    Ok(slots)
+}
+
 /// This adapter refuses unbounded or nonrational endpoints instead of narrowing them.
 pub(super) fn bounds(
     interval: &LcInterval,
@@ -163,7 +179,7 @@ pub(super) fn bounds(
 }
 
 /// Repeated declarations mean intersection, never replacement by the last supplied interval.
-fn intersect(
+pub(super) fn intersect(
     mut left: [Rational; 2],
     right: &[Rational; 2],
     budget: &mut Budget,
