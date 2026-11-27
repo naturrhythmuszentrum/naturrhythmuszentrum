@@ -22,6 +22,10 @@ pub(super) fn source<'a, P: Scalar>(request: &Request<'a, P>) -> Result<&'a Bund
         .ok_or(LoanError::WrongLoan)
 }
 /// Validate all immutable metadata and every original structural entry before allocation.
+#[expect(
+    clippy::too_many_lines,
+    reason = "the ordered common admission checks remain one atomic contract"
+)]
 pub(super) fn check<P: Scalar + 'static>(
     heap: &Heap,
     request: &Request<'_, P>,
@@ -99,6 +103,14 @@ pub(super) fn check<P: Scalar + 'static>(
         request.operation.inputs()[0].descriptor(),
         request.operation.outputs()[0].descriptor(),
     )?;
+    if let Some(super::prepared::PreparedReference::DyadicPower(operation)) = request.prepared {
+        operation.validate_destination(
+            &bundle.declaration,
+            &destination.symbols,
+            destination.axis,
+            destination.coverage,
+        )?;
+    }
     member.representation::<P>(
         &bundle.declaration,
         &destination.symbols,
@@ -120,7 +132,7 @@ pub(super) fn check<P: Scalar + 'static>(
     {
         return Err(LoanError::CoverageMismatch.into());
     }
-    let work = crate::kernels::contract::work(extent.columns(), member.invocation_factor())?;
+    let work = crate::kernels::contract::work(extent.columns(), member.invocation_factor()?)?;
     let payload = extent
         .entries()
         .checked_mul(member.roles())
@@ -209,8 +221,11 @@ impl Evidence {
         identity: Identity,
         revision: u32,
     ) -> Result<(), LoanError> {
-        let member =
-            super::member::Member::check(&self.operation, self.law.kind(), self.prepared.as_ref())?;
+        let member = super::member::Member::check_evidence(
+            &self.operation,
+            self.law.kind(),
+            self.prepared.as_ref(),
+        )?;
         if member.is_binary() != self.endpoint_tokens.binary().is_some() {
             return Err(LoanError::WrongLoan);
         }
@@ -219,12 +234,21 @@ impl Evidence {
         }
 
         if let Some(prepared) = &self.prepared {
-            let original = Rc::ptr_eq(&prepared.operation.inputs, &self.operation.inputs)
-                && Rc::ptr_eq(&prepared.operation.outputs, &self.operation.outputs);
-            if !original {
-                return Err(LoanError::WrongLoan);
+            match prepared {
+                super::PreparedCorrespondence::Expm1(operation) => {
+                    let original = Rc::ptr_eq(&operation.operation.inputs, &self.operation.inputs)
+                        && Rc::ptr_eq(&operation.operation.outputs, &self.operation.outputs);
+                    if !original {
+                        return Err(LoanError::WrongLoan);
+                    }
+                    operation.validate(&self.source, destination)?;
+                }
+                super::PreparedCorrespondence::DyadicPower(_) => {
+                    if member.law().kind() != crate::KernelKind::PreparedDyadicPower {
+                        return Err(LoanError::WrongLoan);
+                    }
+                }
             }
-            prepared.validate(&self.source, destination)?;
         }
         // Copies inherit their source scope, authenticated by the capture seal in chain.
         let arithmetic = !member.is_transform();

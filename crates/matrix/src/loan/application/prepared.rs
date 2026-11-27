@@ -160,6 +160,14 @@ pub enum Expm1ApplicationRequest {
     /// Original complete request, including its exact funded use and source pin.
     ApplicationRefused(ApplicationError, PointwiseExpm1Request),
 }
+/// Borrowed retained-family alternative carries no new edge or allocation.
+#[derive(Clone, Copy)]
+pub(super) enum PreparedReference<'a> {
+    /// Existing expm1 correspondence and target bits.
+    Expm1(&'a PreparedExpm1Operation),
+    /// Original dyadic correspondence and sealed use binding.
+    DyadicPower(&'a super::PreparedDyadicPowerOperation),
+}
 impl crate::Heap {
     /// Apply the paired retained law through the common masked application mechanism.
     pub fn request_pointwise_expm1(
@@ -189,7 +197,7 @@ pub(super) struct Request<'a, P: nrz_scalar::Scalar> {
     /// Optional ordered binary correspondence and borrowed right edge.
     pub(super) binary: Option<(&'a super::PointwiseBinaryOperation, &'a BundlePin<P>)>,
     /// Optional retained correspondence for the prepared member.
-    pub(super) prepared: Option<&'a PreparedExpm1Operation>,
+    pub(super) prepared: Option<PreparedReference<'a>>,
 }
 impl<P: nrz_scalar::Scalar> Request<'_, P> {
     /// Both role inventories participate in initialization and symbolic cleanup.
@@ -208,7 +216,17 @@ impl<P: nrz_scalar::Scalar> Request<'_, P> {
     }
     /// Borrow a complete closed profile only after authenticating the requested entry point.
     pub(super) fn member(&self) -> Result<super::member::Member<'_>, LoanError> {
-        super::member::Member::check(self.operation, self.expected, self.prepared)
+        match self.prepared {
+            Some(PreparedReference::Expm1(operation)) => {
+                super::member::Member::check(self.operation, self.expected, Some(operation))
+            }
+            Some(PreparedReference::DyadicPower(operation)) => super::member::Member::check_dyadic(
+                self.operation,
+                self.expected,
+                &operation.binding,
+            ),
+            None => super::member::Member::check(self.operation, self.expected, None),
+        }
     }
 }
 impl<'a, P: nrz_scalar::Scalar> From<&'a PointwiseRequest<P>> for Request<'a, P> {
@@ -236,20 +254,35 @@ impl<'a> From<&'a PointwiseExpm1Request> for Request<'a, f64> {
             limits: request.limits,
             projected_entry: false,
             binary: None,
-            prepared: Some(&request.operation),
+            prepared: Some(PreparedReference::Expm1(&request.operation)),
             expected: crate::KernelKind::PreparedExpm1,
         }
     }
 }
+impl<'a> From<&'a super::PointwiseDyadicPowerRequest> for Request<'a, f64> {
+    fn from(request: &'a super::PointwiseDyadicPowerRequest) -> Self {
+        Self {
+            operation: &request.operation.operation,
+            input: &request.input,
+            destination: &request.destination,
+            demand: request.demand,
+            limits: request.limits,
+            projected_entry: false,
+            binary: None,
+            prepared: Some(PreparedReference::DyadicPower(&request.operation)),
+            expected: crate::KernelKind::PreparedDyadicPower,
+        }
+    }
+}
 /// Exact value and companion handles, not shape or statement equality.
-fn same_symbols(left: &BindingSymbols, right: &BindingSymbols) -> bool {
+pub(super) fn same_symbols(left: &BindingSymbols, right: &BindingSymbols) -> bool {
     let value = left.value() == right.value();
     let total = left.bound() == right.bound();
     let error = left.error() == right.error();
     value && total && error
 }
 /// Two assembly witnesses share one original declaration snapshot and identity coordinates.
-fn regions(
+pub(super) fn regions(
     input: &RegionContract,
     output: &RegionContract,
     axis: CellAxis,
@@ -306,7 +339,7 @@ fn identity(conversion: &nrz_bindings::Conversion) -> bool {
     scale && shift
 }
 /// Validate independent import symbols and their complete companion relations once.
-fn symbols(
+pub(super) fn symbols(
     source: &BindingSymbols,
     destination: &BindingSymbols,
     extent: crate::Extent,

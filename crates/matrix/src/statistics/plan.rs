@@ -259,6 +259,7 @@ impl CheckedOperation {
             NativeRecipe::Reciprocal { .. } => false,
             NativeRecipe::Kernel(contract) => match &contract.recipe {
                 Recipe::PreparedExpm1
+                | Recipe::PreparedDyadicPower
                 | Recipe::BinaryElementwise(_)
                 | Recipe::CartesianBinary(..)
                 | Recipe::ProjectedElementwise(..)

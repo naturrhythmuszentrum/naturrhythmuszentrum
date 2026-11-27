@@ -339,8 +339,11 @@ impl Heap {
                 charge(
                     budget,
                     9 + 4 * loan.core.channels.iter().flatten().count()
-                        + super::retained_expm1::Attachment::WORK
-                            * usize::from(loan.core.retained_law.is_some()),
+                        + loan
+                            .core
+                            .retained_law
+                            .as_ref()
+                            .map_or(0, |law| law.validation_work()),
                 )
             })
             .and_then(|()| self.authenticate_core(&loan.core, account));

@@ -56,8 +56,9 @@ pub use account::ExecutionAccount;
 pub use application::{
     ApplicationCancellation, ApplicationError, ApplicationEvaluation, ApplicationPublication,
     ApplicationRequest, BinaryApplicationRequest, BinaryRegion, CellOutcome,
-    Expm1ApplicationRequest, NumericalErrorScope, OwnedApplication, PointwiseBinaryOperation,
-    PointwiseBinaryRequest, PointwiseExpm1Request, PointwiseRequest, PreparedExpm1Operation,
+    DyadicPowerApplicationRequest, Expm1ApplicationRequest, NumericalErrorScope, OwnedApplication,
+    PointwiseBinaryOperation, PointwiseBinaryRequest, PointwiseDyadicPowerRequest,
+    PointwiseExpm1Request, PointwiseRequest, PreparedDyadicPowerOperation, PreparedExpm1Operation,
 };
 pub use declaration::{HostChannel, HostTileDeclaration};
 pub use endpoint_view::{EndpointReadError, EndpointReading, EndpointTileReader};

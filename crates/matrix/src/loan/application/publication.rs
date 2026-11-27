@@ -48,8 +48,12 @@ pub(super) fn publish<P: Scalar + 'static>(
                 budget,
                 25 + usize::from(owner.core.evidence.endpoint_tokens.binary().is_some())
                     + 7 * usize::from(owner.core.evidence.prepared.is_some())
-                    + crate::loan::retained_expm1::Attachment::WORK
-                        * usize::from(owner.core.host.retained_law.is_some()),
+                    + owner
+                        .core
+                        .host
+                        .retained_law
+                        .as_ref()
+                        .map_or(0, |law| law.validation_work()),
             )?;
             authenticate(heap, &owner.core, account.identity)
         },
@@ -184,7 +188,7 @@ fn prepare<P: Scalar + 'static>(
         side.validate_pin::<P>(core.host.identity.account)?;
     }
     core.evidence.validate(&core.host.declaration, identity)?;
-    super::member::Member::check(
+    super::member::Member::check_evidence(
         &core.evidence.operation,
         core.evidence.law.kind(),
         core.evidence.prepared.as_ref(),
@@ -265,7 +269,7 @@ fn derive<P: Scalar + 'static>(
 ) -> Result<(), LoanError> {
     crate::loan::lifecycle::complete(&mut core.host, budget)?;
     super::endpoints::complete(core, budget)?;
-    let member = super::member::Member::check(
+    let member = super::member::Member::check_evidence(
         &core.evidence.operation,
         core.evidence.law.kind(),
         core.evidence.prepared.as_ref(),

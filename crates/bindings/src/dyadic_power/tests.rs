@@ -3,11 +3,11 @@
 //!
 //! | Test | Area | Claim |
 //! |------|------|-------|
-//! | [`dyadic_power_correspondence`] | bindings | Original syntax, carriers, exact represented box and the closed checked-outcome allow-list stay associated. |
+//! | [`dyadic_power_correspondence`] | bindings | Original syntax, reached inspection groups, carriers, exact represented box and the closed checked-outcome allow-list stay associated. |
 
 use super::*;
 use nrz_cas::{
-    Reference,
+    Exhaustion, FaultKind, Reference,
     domain::{AmbientDomain, ContextDraft, HeaderDraft, RegionDraft, RegionExpr},
     syntax::{Declaration, Draft, Environment, ExpressionDraft},
 };
@@ -31,6 +31,8 @@ struct Fixture {
     cas: Cas,
     /// Actual original power target.
     target: Handle,
+    /// Admitted region shares the target's header but is not an expression.
+    region: Handle,
     /// Actual context whose header owns the original.
     context: Handle,
     /// Exact original free-coordinate identity.
@@ -74,7 +76,7 @@ impl Fixture {
                 assumptions: vec![],
             }),
         ];
-        let [parent, header, _, context]: [Handle; 4] = cas
+        let [parent, header, region, context]: [Handle; 4] = cas
             .admit(&drafts, &mut budget)?
             .try_into()
             .map_err(|_| "header fixture")?;
@@ -113,6 +115,7 @@ impl Fixture {
         Ok(Self {
             cas,
             target,
+            region,
             context,
             base,
             parent,
@@ -187,6 +190,47 @@ impl Fixture {
             .remove(0);
         Ok(target)
     }
+
+    /// Admit a real power whose base is a rational expression rather than the free coordinate.
+    fn other_base_operator(&mut self) -> Result<Handle, Box<dyn std::error::Error>> {
+        let mut budget = Budget::new(limits())?;
+        let sort = Sort::Value(AtomicSort::Scalar(Field::Real));
+        let base = self
+            .cas
+            .admit(
+                &[Draft::Expression(ExpressionDraft {
+                    space: None,
+                    operator: Operator::Rational(Rational::from_ratio(1, 1, &mut budget)?),
+                    sort: sort.clone(),
+                    header: Reference::Existing(self.header.clone()),
+                    scope: vec![],
+                    binding: None,
+                    operands: vec![].into_iter().collect(),
+                })],
+                &mut budget,
+            )?
+            .remove(0);
+        Ok(self
+            .cas
+            .admit(
+                &[Draft::Expression(ExpressionDraft {
+                    space: None,
+                    operator: Operator::PositivePower,
+                    sort,
+                    header: Reference::Existing(self.header.clone()),
+                    scope: vec![],
+                    binding: None,
+                    operands: vec![
+                        Reference::Existing(base),
+                        Reference::Existing(self.exponent.clone()),
+                    ]
+                    .into_iter()
+                    .collect(),
+                })],
+                &mut budget,
+            )?
+            .remove(0))
+    }
 }
 
 /// Explicit one-round policy tests inclusion even when the requested width is unavailable.
@@ -222,14 +266,86 @@ fn api_inspection_work(
 /// Compare one inspected prefix with fresh API calls and the reached wrapper groups.
 /// # Panics
 /// Panics only if the wrapper's prepaid group total differs from its declared tariff.
+#[expect(
+    clippy::too_many_lines,
+    reason = "the one correspondence control compares all reached inspection groups"
+)]
 fn check_inspection_receipts() -> Result<(), Box<dyn std::error::Error>> {
     let valid = Fixture::new(1, 2)?;
     let valid_api = Fixture::new(1, 2)?;
     let mut budget = Budget::new(limits())?;
     assert!(inspect(&valid.cas, &valid.target, &valid.context, &mut budget).is_ok());
+    let valid_api_work = api_inspection_work(&valid_api, &valid_api.target, true)?;
+    assert_eq!(budget.usage().work, valid_api_work + 21);
+
+    // Admitted PositivePower syntax requires expression operands, so the node-kind
+    // group is reached on the valid graph and bounded before the following group.
+    let mut budget = Budget::new(nrz_cas::limits::Limits {
+        work: valid_api_work + 17,
+        ..limits()
+    })?;
+    let Err(DyadicPowerPreparationError::Exact(fault)) =
+        inspect(&valid.cas, &valid.target, &valid.context, &mut budget)
+    else {
+        return Err("bounded operand node-kind group".into());
+    };
+    assert_eq!(budget.usage().work, valid_api_work + 17);
+    assert_eq!(
+        fault.kind,
+        FaultKind::Exhausted {
+            reason: Exhaustion::Limit,
+            budget: BudgetKind::Work,
+            limit: valid_api_work + 17,
+            needed: valid_api_work + 21,
+        }
+    );
+
+    let nonexpression = Fixture::new(1, 2)?;
+    let mut budget = Budget::new(limits())?;
+    assert!(matches!(
+        inspect(
+            &nonexpression.cas,
+            &nonexpression.region,
+            &nonexpression.context,
+            &mut budget,
+        ),
+        Err(DyadicPowerPreparationError::UnsupportedOriginal)
+    ));
+    let api = Fixture::new(1, 2)?;
     assert_eq!(
         budget.usage().work,
-        api_inspection_work(&valid_api, &valid_api.target, true)? + 21
+        api_inspection_work(&api, &api.region, false)? + 5
+    );
+
+    let wrong_operator = Fixture::new(1, 2)?;
+    let mut budget = Budget::new(limits())?;
+    assert!(matches!(
+        inspect(
+            &wrong_operator.cas,
+            &wrong_operator.exponent,
+            &wrong_operator.context,
+            &mut budget,
+        ),
+        Err(DyadicPowerPreparationError::UnsupportedOriginal)
+    ));
+    let api = Fixture::new(1, 2)?;
+    assert_eq!(
+        budget.usage().work,
+        api_inspection_work(&api, &api.exponent, false)? + 7
+    );
+
+    let mut wrong_base = Fixture::new(1, 2)?;
+    let target = wrong_base.other_base_operator()?;
+    let mut api = Fixture::new(1, 2)?;
+    let api_target = api.other_base_operator()?;
+    let mut budget = Budget::new(limits())?;
+    assert!(matches!(
+        inspect(&wrong_base.cas, &target, &wrong_base.context, &mut budget),
+        Err(DyadicPowerPreparationError::UnsupportedOriginal)
+    ));
+    assert_eq!(
+        budget.usage().work,
+        api_inspection_work(&api, &api_target, true)? + 21
     );
 
     let mut bad_target = Fixture::new(1, 2)?;

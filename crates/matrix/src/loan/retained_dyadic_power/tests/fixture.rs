@@ -17,8 +17,17 @@ use nrz_bindings::{
 };
 use nrz_scalar::{ArithmeticContext, DyadicPowerLimits};
 
+/// Observe the same weak owner and use edges used by the retained lifetime control.
+pub(in crate::loan) fn destruction_witness(
+    law: &RetainedDyadicPower,
+) -> Result<impl Fn() -> bool + use<>, Box<dyn std::error::Error>> {
+    let owner = std::rc::Rc::downgrade(law.record.owner.as_ref().ok_or("owner edge")?);
+    let use_record = std::rc::Rc::downgrade(&law.record);
+    Ok(move || owner.upgrade().is_none() && use_record.upgrade().is_none())
+}
+
 /// Exact and managed budgets are fixed before each lifecycle begins.
-pub(super) fn limits() -> Limits {
+pub(in crate::loan) fn limits() -> Limits {
     Limits {
         work: 2_000_000_000,
         arithmetic_steps: 50_000_000,
@@ -30,7 +39,7 @@ pub(super) fn limits() -> Limits {
 }
 
 /// Give only normal-threshold preparation and exact oracles their larger CAS capacities.
-pub(super) fn threshold_limits() -> Limits {
+pub(in crate::loan) fn threshold_limits() -> Limits {
     Limits {
         component_bits: 8_192,
         intermediate_bits: 16_384,
@@ -41,7 +50,7 @@ pub(super) fn threshold_limits() -> Limits {
 }
 
 /// The one-round policy permits a checked width-limit bound to establish inclusion.
-pub(super) fn policy() -> RefinementPolicy {
+pub(in crate::loan) fn policy() -> RefinementPolicy {
     RefinementPolicy {
         version: 1,
         precision: 16,
@@ -54,7 +63,7 @@ pub(super) fn policy() -> RefinementPolicy {
 }
 
 /// The scalar leaf receives its own explicit finite inventories.
-pub(super) const fn scalar_limits() -> DyadicPowerLimits {
+pub(in crate::loan) const fn scalar_limits() -> DyadicPowerLimits {
     DyadicPowerLimits {
         exponent_bits: 63,
         root_steps: 63,
@@ -63,13 +72,13 @@ pub(super) const fn scalar_limits() -> DyadicPowerLimits {
 }
 
 /// Construct one original graph with a free real coordinate and literal rational exponent.
-pub(super) fn original(n: i64, d: u64) -> TestResult<(Cas, Handle, Handle)> {
+pub(in crate::loan) fn original(n: i64, d: u64) -> TestResult<(Cas, Handle, Handle)> {
     let mut budget = Budget::new(limits())?;
     original_rational(Rational::from_ratio(n, d, &mut budget)?)
 }
 
 /// Construct the normal-threshold graph under its isolated exact capacities.
-pub(super) fn threshold_original(n: i64, d: u64) -> TestResult<(Cas, Handle, Handle)> {
+pub(in crate::loan) fn threshold_original(n: i64, d: u64) -> TestResult<(Cas, Handle, Handle)> {
     let mut budget = Budget::new(threshold_limits())?;
     original_rational_with_limits(Rational::from_ratio(n, d, &mut budget)?, threshold_limits())
 }

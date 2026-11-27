@@ -6,6 +6,10 @@ pub(in crate::loan) mod affine;
 pub(super) mod binary;
 mod chain;
 mod contract;
+mod dyadic_power;
+pub use dyadic_power::{
+    DyadicPowerApplicationRequest, PointwiseDyadicPowerRequest, PreparedDyadicPowerOperation,
+};
 mod movement;
 pub use binary::{
     BinaryApplicationRequest, BinaryRegion, PointwiseBinaryOperation, PointwiseBinaryRequest,
@@ -22,6 +26,7 @@ use super::registry::{
     Bundle, CancellationReceipt, Declaration, Identity, LoanTicket, PublicationReceipt,
     QualifiedMaskVersion, Token,
 };
+use super::retained_dyadic_power::Binding as DyadicBinding;
 use super::{BundlePin, ExecutionAccount, HostTileDeclaration, LoanError, PublishedTile};
 use crate::{CheckedOperation, ExecutionLimits, Heap, KernelError, MaskVersion, StructureScope};
 use nrz_scalar::Scalar;
@@ -134,6 +139,54 @@ pub enum CellOutcome {
         /// Lossless native validation or arithmetic refusal.
         reason: nrz_scalar::Expm1Failure,
     },
+    /// First dyadic refusal outside the admitted positive domain.
+    DyadicPowerOutsideDomain {
+        /// Original component within the cell.
+        component: usize,
+    },
+    /// First dyadic refusal for a nonzero below-normal operand.
+    DyadicPowerBelowNormalOperand {
+        /// Original component within the cell.
+        component: usize,
+    },
+    /// First dyadic refusal for a non-dyadic exponent.
+    DyadicPowerNonDyadicExponent {
+        /// Original component within the cell.
+        component: usize,
+    },
+    /// First dyadic refusal when finite outward endpoints cannot be certified.
+    DyadicPowerTargetNotCertifiable {
+        /// Original component within the cell.
+        component: usize,
+        /// Exact arithmetic cause.
+        failure: nrz_scalar::ArithmeticFailure,
+    },
+    /// First dyadic refusal at an independent inventory limit.
+    DyadicPowerInventoryLimit {
+        /// Original component within the cell.
+        component: usize,
+        /// Supplied full-width limit.
+        limit: usize,
+        /// Derived full-width need.
+        needed: usize,
+    },
+    /// First dyadic refusal for a malformed native plan.
+    DyadicPowerMalformedPlan {
+        /// Original component within the cell.
+        component: usize,
+    },
+    /// First dyadic refusal for an unsupported arithmetic environment.
+    DyadicPowerEnvironment {
+        /// Original component within the cell.
+        component: usize,
+    },
+    /// First dyadic refusal for a non-certification arithmetic invariant.
+    DyadicPowerEngine {
+        /// Original component within the cell.
+        component: usize,
+        /// Exact arithmetic cause.
+        failure: nrz_scalar::ArithmeticFailure,
+    },
     /// First numerical refusal in component order; later components are still evaluated.
     CellRefused {
         /// Original component within this logical cell.
@@ -141,6 +194,61 @@ pub enum CellOutcome {
         /// Original typed kernel reason, including its original flat entry.
         reason: KernelError,
     },
+}
+/// Preserve every native dyadic cause and full-width payload in the common inline outcome.
+pub(super) const fn dyadic_refusal(
+    component: usize,
+    reason: nrz_scalar::DyadicPowerFailure,
+) -> CellOutcome {
+    use nrz_scalar::DyadicPowerFailure as Failure;
+    match reason {
+        Failure::OutsideDomain => CellOutcome::DyadicPowerOutsideDomain { component },
+        Failure::BelowNormalOperand => CellOutcome::DyadicPowerBelowNormalOperand { component },
+        Failure::NonDyadicExponent => CellOutcome::DyadicPowerNonDyadicExponent { component },
+        Failure::TargetNotCertifiable { failure } => {
+            CellOutcome::DyadicPowerTargetNotCertifiable { component, failure }
+        }
+        Failure::InventoryLimit { limit, needed } => CellOutcome::DyadicPowerInventoryLimit {
+            component,
+            limit,
+            needed,
+        },
+        Failure::MalformedPlan => CellOutcome::DyadicPowerMalformedPlan { component },
+        Failure::Environment => CellOutcome::DyadicPowerEnvironment { component },
+        Failure::Engine { failure } => CellOutcome::DyadicPowerEngine { component, failure },
+    }
+}
+/// Closed retained correspondence stored inline without widening the shared evidence header.
+#[derive(Clone, Debug)]
+pub(super) enum PreparedCorrespondence {
+    /// Existing expm1 original and target correspondence.
+    Expm1(PreparedExpm1Operation),
+    /// Full dyadic owner and funded-use seal; common evidence retains the declarations.
+    DyadicPower(DyadicBinding),
+}
+impl PreparedCorrespondence {
+    /// Borrow the existing expm1 correspondence only for its matching member.
+    pub(super) const fn expm1(&self) -> Option<&PreparedExpm1Operation> {
+        match self {
+            Self::Expm1(operation) => Some(operation),
+            Self::DyadicPower(_) => None,
+        }
+    }
+    /// Mutate only the expm1 alternative in private pairing fixtures.
+    #[cfg(test)]
+    pub(super) const fn expm1_mut(&mut self) -> Option<&mut PreparedExpm1Operation> {
+        match self {
+            Self::Expm1(operation) => Some(operation),
+            Self::DyadicPower(_) => None,
+        }
+    }
+    /// Borrow the full dyadic binding only for its matching member.
+    pub(super) const fn dyadic_power(&self) -> Option<DyadicBinding> {
+        match self {
+            Self::Expm1(_) => None,
+            Self::DyadicPower(binding) => Some(*binding),
+        }
+    }
 }
 /// Sole application capability; no output setter or public completion constructor exists.
 pub struct OwnedApplication<P: Scalar> {
@@ -225,7 +333,7 @@ pub(super) struct Evidence {
     /// Explicit error-channel semantics authenticated against the captured member.
     pub(in crate::loan) error_scope: NumericalErrorScope,
     /// Closed prepared correspondence, absent for Square.
-    pub(super) prepared: Option<PreparedExpm1Operation>,
+    pub(super) prepared: Option<PreparedCorrespondence>,
     /// Fixed Lower/Upper payload identities sealed before evaluation.
     pub(in crate::loan) endpoint_tokens: binary::Auxiliary,
     /// Non-owning identity of the immutable completed mask, installed only at publication.
@@ -318,7 +426,7 @@ impl Origin {
             .get(cell)
             .ok_or(LoanError::LayoutMismatch)?;
         if evidence.endpoint_tokens.binary().is_some() {
-            member::Member::check(
+            member::Member::check_evidence(
                 &evidence.operation,
                 evidence.law.kind(),
                 evidence.prepared.as_ref(),
