@@ -9,6 +9,21 @@ use crate::loan::{
 };
 use nrz_scalar::{ArithmeticContext, Enclosure, Finite, Scalar};
 
+/// Pair a concrete retained-law family with the corresponding captured binding.
+fn validate_law_binding(
+    law: &crate::loan::retained_law::RetainedLawAttachment,
+    operation: &super::PreparedCorrespondence,
+) -> Result<(), LoanError> {
+    match operation {
+        super::PreparedCorrespondence::Expm1(operation) => {
+            law.validate_binding(operation.binding, operation.bits)
+        }
+        super::PreparedCorrespondence::DyadicPower(binding) => {
+            law.validate_dyadic_binding(*binding)
+        }
+    }
+}
+
 /// Fixed allocation identity is never a transferable numerical authority.
 const fn identity(token: &Token) -> (usize, u64, u64) {
     (token.slot, token.key, token.receipt)
@@ -34,11 +49,13 @@ pub(super) fn validate_core<P: Scalar>(core: &ApplicationCore<P>) -> Result<(), 
     if core.evidence.completed_mask.is_some() {
         return Err(LoanError::WrongLoan);
     }
-    core.host
-        .retained_law
-        .as_ref()
-        .ok_or(LoanError::WrongLoan)?
-        .validate_binding(operation.binding, operation.bits)?;
+    validate_law_binding(
+        core.host
+            .retained_law
+            .as_ref()
+            .ok_or(LoanError::WrongLoan)?,
+        operation,
+    )?;
     let pair = core.endpoints.as_ref().ok_or(LoanError::WrongLoan)?;
     let tokens = pair.each_ref().map(|owner| identity(&owner.tokens[0]));
     pairing(&core.evidence, core.host.identity, tokens)?;
@@ -95,11 +112,10 @@ pub(in crate::loan) fn validate_bundle(bundle: &Bundle) -> Result<(), LoanError>
     if evidence.completed_mask != Some(std::ptr::NonNull::from(bundle.mask.as_ref())) {
         return Err(LoanError::WrongLoan);
     }
-    bundle
-        .retained_law
-        .as_ref()
-        .ok_or(LoanError::WrongLoan)?
-        .validate_binding(operation.binding, operation.bits)?;
+    validate_law_binding(
+        bundle.retained_law.as_ref().ok_or(LoanError::WrongLoan)?,
+        operation,
+    )?;
     let pair = bundle.endpoints.as_ref().ok_or(LoanError::WrongLoan)?;
     pairing(
         evidence,
@@ -214,15 +230,46 @@ impl crate::TileReader<'_, f64> {
         component: usize,
         account: &mut crate::ExecutionAccount,
     ) -> Result<[f64; 2], LoanError> {
+        self.prepared_endpoints(cell, component, account, false)
+    }
+
+    /// Load the stored dyadic image endpoints from a completed selected component.
+    /// # Errors
+    /// Refuses foreign families, holes, failed cells, bounds, accounts or either load's Work.
+    pub fn dyadic_power_endpoints(
+        &self,
+        cell: usize,
+        component: usize,
+        account: &mut crate::ExecutionAccount,
+    ) -> Result<[f64; 2], LoanError> {
+        self.prepared_endpoints(cell, component, account, true)
+    }
+
+    /// Authenticate the selected prepared family before either common endpoint load.
+    /// # Errors
+    /// Refuses another family, an incomplete cell, invalid bounds or exhausted Work.
+    fn prepared_endpoints(
+        &self,
+        cell: usize,
+        component: usize,
+        account: &mut crate::ExecutionAccount,
+        dyadic: bool,
+    ) -> Result<[f64; 2], LoanError> {
         account.authenticate(self.account)?;
         let bundle = self.bundle;
-        if bundle
+        let prepared = bundle
             .origin
             .evidence
             .as_ref()
-            .and_then(|evidence| evidence.prepared.as_ref())
-            .is_none()
-        {
+            .and_then(|evidence| evidence.prepared.as_ref());
+        let same_family = prepared.is_some_and(|prepared| {
+            if dyadic {
+                super::PreparedCorrespondence::dyadic_power(prepared).is_some()
+            } else {
+                super::PreparedCorrespondence::expm1(prepared).is_some()
+            }
+        });
+        if !same_family {
             return Err(LoanError::UnsupportedContract);
         }
         if cell >= self.capacity() || component >= bundle.declaration.extent.columns() {

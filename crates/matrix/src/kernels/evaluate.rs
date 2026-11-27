@@ -31,6 +31,7 @@ pub(crate) fn evaluate<P: Scalar + 'static, Q: Scalar + 'static>(
         Recipe::PositiveReciprocal(_)
         | Recipe::Quantity(_)
         | Recipe::PreparedExpm1
+        | Recipe::PreparedDyadicPower
         | Recipe::BinaryElementwise(_)
         | Recipe::CartesianBinary(..)
         | Recipe::ProjectedAffine(..) => {

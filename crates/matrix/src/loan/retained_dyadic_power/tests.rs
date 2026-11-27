@@ -10,8 +10,8 @@
 //! | [`retained_dyadic_power_observation`] | matrix | Native reuse neither prepares another authority nor spends exact Work. |
 
 mod bytes;
-mod fixture;
-mod observation;
+pub(in crate::loan) mod fixture;
+pub(in crate::loan) mod observation;
 
 use crate::HeapLimits;
 use nrz_bindings::{Budget, readings::algebra::Rational};

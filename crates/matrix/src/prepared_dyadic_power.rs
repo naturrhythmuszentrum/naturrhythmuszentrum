@@ -79,6 +79,11 @@ pub(crate) struct OwnedParts {
 }
 
 impl OwnedParts {
+    /// Borrow the immutable root, square and multiply counts admitted by the scalar program.
+    pub(crate) const fn schedule_inventory(&self) -> [usize; 3] {
+        self.program.inventory()
+    }
+
     /// Report the admitted native program's argument revision for the owner seal.
     pub(crate) const fn argument_revision(&self) -> u32 {
         self.program.argument_revision()

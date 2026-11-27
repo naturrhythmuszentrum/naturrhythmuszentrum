@@ -138,6 +138,65 @@ pub(super) fn request_expm1(
         Err(error) => super::Expm1ApplicationRequest::ApplicationRefused(error, request),
     }
 }
+/// The dyadic use moves only after full common admission and concrete validation succeed.
+pub(super) fn request_dyadic_power(
+    heap: &mut Heap,
+    request: super::PointwiseDyadicPowerRequest,
+    account: &mut ExecutionAccount,
+) -> super::DyadicPowerApplicationRequest {
+    let checked = account.ledger.with_work_phase(
+        super::FAMILY,
+        "dyadic power application admission",
+        |budget| {
+            request
+                .law
+                .authenticate_identity_account(account.identity)?;
+            crate::loan::charge(budget, crate::loan::retained_dyadic_power::Attachment::WORK)?;
+            super::dyadic_power::check_current(
+                heap,
+                &request.law,
+                request.operation.binding,
+                account.identity,
+            )?;
+            let borrowed = super::prepared::Request::from(&request);
+            super::contract::check(
+                heap,
+                &borrowed,
+                account.identity,
+                super::chain::Input::Host,
+                budget,
+            )?;
+            let plan = plan::Plan::new(heap, &borrowed, budget)?;
+            crate::loan::retained_dyadic_power::Attachment::prepare_validation(
+                &request.law,
+                request.operation.binding,
+                heap,
+                budget,
+            )?;
+            preparation::prepare(heap, &borrowed, plan).map_err(ApplicationError::from)
+        },
+    );
+    match checked {
+        Ok(mut prepared) => {
+            let Some(shell) = prepared.core.host.retained_law.as_mut() else {
+                return super::DyadicPowerApplicationRequest::ApplicationRefused(
+                    LoanError::WrongLoan.into(),
+                    request,
+                );
+            };
+            if shell.require_empty().is_err() {
+                return super::DyadicPowerApplicationRequest::ApplicationRefused(
+                    LoanError::WrongLoan.into(),
+                    request,
+                );
+            }
+            prepared.core.input = Some(request.input);
+            shell.install_dyadic_power(request.law);
+            super::DyadicPowerApplicationRequest::ApplicationReady(install(heap, prepared))
+        }
+        Err(error) => super::DyadicPowerApplicationRequest::ApplicationRefused(error, request),
+    }
+}
 /// Both pins move only after the same complete private preparation as unary members.
 pub(super) fn request_binary<P: Scalar + 'static>(
     heap: &mut Heap,
@@ -230,6 +289,16 @@ fn install<P: Scalar>(heap: &mut Heap, prepared: Prepared<P>) -> OwnedApplicatio
 pub(super) fn check_plan(
     heap: &Heap,
     request: &super::PointwiseExpm1Request,
+    budget: &mut nrz_bindings::Budget,
+) -> Result<(), LoanError> {
+    plan::Plan::new(heap, &super::prepared::Request::from(request), budget).map(|_| ())
+}
+
+/// Isolate the dyadic request's complete internal plan from independently funded setup.
+#[cfg(test)]
+pub(super) fn check_plan_dyadic(
+    heap: &Heap,
+    request: &super::PointwiseDyadicPowerRequest,
     budget: &mut nrz_bindings::Budget,
 ) -> Result<(), LoanError> {
     plan::Plan::new(heap, &super::prepared::Request::from(request), budget).map(|_| ())

@@ -96,6 +96,35 @@ pub struct RetainedDyadicPower {
 }
 
 impl RetainedDyadicPower {
+    /// Require the original execution account before borrowing this funded use.
+    pub(in crate::loan) fn authenticate_account(
+        &self,
+        account: &super::ExecutionAccount,
+    ) -> Result<(), LoanError> {
+        account.authenticate(self.owner()?.identity.account)
+    }
+
+    /// Compare the original account identity before inspecting current debit witnesses.
+    pub(in crate::loan) fn authenticate_identity_account(
+        &self,
+        account: u64,
+    ) -> Result<(), LoanError> {
+        if self.owner()?.identity.account != account {
+            return Err(LoanError::ForeignAccount);
+        }
+        Ok(())
+    }
+
+    /// Reuse the existing owner and use authentication without allocating another edge.
+    pub(in crate::loan) fn validate_current(&self, heap: &crate::Heap) -> Result<(), LoanError> {
+        retention::authenticate(heap, self)
+    }
+
+    /// Borrow the admitted schedule counts without rereading CAS or the caller's exponent.
+    pub(in crate::loan) fn schedule_inventory(&self) -> Result<[usize; 3], LoanError> {
+        Ok(self.frozen()?.parts.schedule_inventory())
+    }
+
     /// Evaluate only the admitted native point schedule through this funded borrow.
     /// # Errors
     /// Preserves the scalar environment, below-normal, domain and certification causes.
@@ -137,7 +166,7 @@ impl RetainedDyadicPower {
 
 /// One exact use identity and immutable native/proof specialization.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct Binding {
+pub(in crate::loan) struct Binding {
     /// Original heap/account/owner identity.
     identity: LawIdentity,
     /// Unique funded use identity.
@@ -148,13 +177,98 @@ struct Binding {
 
 impl Binding {
     /// Capture paired metadata without acquiring or upgrading an edge.
-    fn of(law: &RetainedDyadicPower) -> Result<Self, LoanError> {
+    pub(in crate::loan) fn of(law: &RetainedDyadicPower) -> Result<Self, LoanError> {
         Ok(Self {
             identity: law.owner()?.identity,
             use_identity: law.record.token.key,
             seal: law.frozen()?.seal,
         })
     }
+
+    /// Arithmetic revision already sealed with this exact funded use.
+    pub(in crate::loan) const fn arithmetic_revision(self) -> u32 {
+        self.seal.revisions[1]
+    }
+
+    /// Derive the authenticated root, square and multiply counts from the sealed exponent.
+    pub(in crate::loan) fn schedule_inventory(self) -> Result<[usize; 3], LoanError> {
+        let (numerator, degree) = self.seal.exponent;
+        if numerator == 0 {
+            return Err(LoanError::WrongLoan);
+        }
+        let roots = usize::try_from(degree).map_err(|_| LoanError::CountOverflow)?;
+        let squares = usize::try_from(u64::BITS - 1 - numerator.leading_zeros())
+            .map_err(|_| LoanError::CountOverflow)?;
+        let multiplies =
+            usize::try_from(numerator.count_ones() - 1).map_err(|_| LoanError::CountOverflow)?;
+        Ok([roots, squares, multiplies])
+    }
+}
+
+/// Private application attachment owns one already funded dyadic use.
+#[derive(Debug)]
+pub(in crate::loan) struct Attachment {
+    /// The exact use survives ready, candidate, repair and publication.
+    law: RetainedDyadicPower,
+}
+
+impl Attachment {
+    /// Prepay authentication before any application allocation prefix is acquired.
+    pub(in crate::loan) fn prepare_validation(
+        law: &RetainedDyadicPower,
+        binding: Binding,
+        heap: &crate::Heap,
+        budget: &mut nrz_bindings::Budget,
+    ) -> Result<(), LoanError> {
+        super::charge(budget, 2 * Self::WORK)?;
+        if Binding::of(law)? != binding {
+            return Err(LoanError::WrongLoan);
+        }
+        retention::authenticate(heap, law)
+    }
+
+    /// Transfer the checked use without allocating or acquiring another edge.
+    pub(in crate::loan) const fn prepared(law: RetainedDyadicPower) -> Self {
+        Self { law }
+    }
+
+    /// Compare the retained use with the captured correspondence.
+    pub(in crate::loan) fn validate_binding(&self, binding: Binding) -> Result<(), LoanError> {
+        if Binding::of(&self.law)? != binding {
+            return Err(LoanError::WrongLoan);
+        }
+        Ok(())
+    }
+
+    /// Authenticate the immutable use seal without another funded use.
+    pub(in crate::loan) fn validate(&self) -> Result<(), LoanError> {
+        if Binding::of(&self.law)? != self.law.record.binding {
+            return Err(LoanError::WrongLoan);
+        }
+        Ok(())
+    }
+
+    /// Authenticate the current owner and use debit witnesses.
+    pub(in crate::loan) fn validate_current(&self, heap: &crate::Heap) -> Result<(), LoanError> {
+        retention::authenticate(heap, &self.law)
+    }
+
+    /// Evaluate only the admitted native schedule through this same use.
+    pub(in crate::loan) fn evaluate(
+        &self,
+        x: f64,
+        context: &nrz_scalar::ArithmeticContext,
+    ) -> Result<crate::DyadicPowerEvaluation<'_>, nrz_scalar::DyadicPowerFailure> {
+        self.law.evaluate(x, context)
+    }
+
+    /// Diagnostic identity of the original owner, without an ownership edge.
+    pub(in crate::loan) fn owner_identity(&self) -> u64 {
+        self.law.record.binding.identity.owner
+    }
+
+    /// One owner validation and two debit/index inspections.
+    pub(in crate::loan) const WORK: usize = 3;
 }
 
 /// Reuse the heap's nonwrapping allocator for owner, use and receipt identities.

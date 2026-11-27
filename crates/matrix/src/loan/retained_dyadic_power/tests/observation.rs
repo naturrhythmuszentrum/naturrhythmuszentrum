@@ -11,7 +11,7 @@ use std::{
 
 /// Shared local subscriber state for one selected observation control.
 #[derive(Clone, Default)]
-pub(super) struct OwnerObserver {
+pub(in crate::loan) struct OwnerObserver {
     /// Next span identity.
     next: Arc<AtomicU64>,
     /// Assigned span names.
@@ -107,7 +107,7 @@ impl OwnerObserver {
     /// Return all span identifiers with the requested phase name.
     /// # Panics
     /// Panics only if this local test's name lock is poisoned.
-    pub(super) fn spans(&self, name: &str) -> Vec<u64> {
+    pub(in crate::loan) fn spans(&self, name: &str) -> Vec<u64> {
         self.names
             .lock()
             .expect("observer name lock")
@@ -120,7 +120,7 @@ impl OwnerObserver {
     /// Return the last visited value of one named field on one span.
     /// # Panics
     /// Panics only if this local test's field lock is poisoned.
-    pub(super) fn field(&self, id: u64, name: &str) -> Option<String> {
+    pub(in crate::loan) fn field(&self, id: u64, name: &str) -> Option<String> {
         self.fields
             .lock()
             .expect("observer field lock")

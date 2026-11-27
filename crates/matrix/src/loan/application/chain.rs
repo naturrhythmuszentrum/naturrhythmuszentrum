@@ -259,7 +259,9 @@ fn eligible(source: &Bundle) -> Result<(), LoanError> {
                     return Err(LoanError::UnsupportedContract);
                 }
             }
-            Member::PreparedExpm1(..) => return Err(LoanError::UnsupportedContract),
+            Member::PreparedExpm1(..) | Member::PreparedDyadicPower(..) => {
+                return Err(LoanError::UnsupportedContract);
+            }
         }
     }
     super::contract::attachments(source)
@@ -290,7 +292,7 @@ fn inventory(group: &Group, bundle: &Bundle) -> Result<(), LoanError> {
 
 /// Capture seals inherited copy semantics while the immediate source is still retained.
 fn error_scope(evidence: &Evidence, source: &Bundle) -> Result<(), LoanError> {
-    let member = Member::check(
+    let member = Member::check_evidence(
         &evidence.operation,
         evidence.law.kind(),
         evidence.prepared.as_ref(),

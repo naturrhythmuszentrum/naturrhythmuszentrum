@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! A closed retained-law allocation moves with its containing application bundle.
 
-use super::{LoanError, retained_expm1};
+use super::{LoanError, retained_dyadic_power, retained_expm1};
 use crate::Heap;
 
 /// The admitted laws whose already funded uses can be retained by an application.
@@ -10,6 +10,8 @@ use crate::Heap;
 enum RetainedLaw {
     /// The original expm1 use and its exact binding.
     Expm1(retained_expm1::Attachment),
+    /// The original dyadic power use and its exact binding.
+    DyadicPower(retained_dyadic_power::Attachment),
 }
 
 /// A private shell exists before the fallible preparation finishes its ownership transfer.
@@ -21,6 +23,9 @@ pub(in crate::loan) struct RetainedLawAttachment {
 }
 
 impl RetainedLawAttachment {
+    /// At shared charge sites, only private substitution leaves a shell unfilled; validation refuses it before inspection, and its three Work keeps the refusal prefix independent of fill state.
+    const EMPTY_WORK: usize = 3;
+
     /// Construct the separately reserved empty shell.
     pub(in crate::loan) const fn empty() -> Self {
         Self { law: None }
@@ -34,11 +39,30 @@ impl RetainedLawAttachment {
         Ok(())
     }
 
+    /// Charge each filled law's validation tariff or an unfilled shell's three Work; preparation fills the shell before transfer.
+    pub(in crate::loan) const fn validation_work(&self) -> usize {
+        match &self.law {
+            Some(RetainedLaw::DyadicPower(_)) => retained_dyadic_power::Attachment::WORK,
+            Some(RetainedLaw::Expm1(_)) => retained_expm1::Attachment::WORK,
+            None => Self::EMPTY_WORK,
+        }
+    }
+
     /// Move the checked expm1 use into the preallocated shell.
     pub(in crate::loan) fn install_expm1(&mut self, law: retained_expm1::RetainedExpm1) {
         self.law = Some(RetainedLaw::Expm1(retained_expm1::Attachment::prepared(
             law,
         )));
+    }
+
+    /// Move the checked dyadic use into the preallocated shell.
+    pub(in crate::loan) fn install_dyadic_power(
+        &mut self,
+        law: retained_dyadic_power::RetainedDyadicPower,
+    ) {
+        self.law = Some(RetainedLaw::DyadicPower(
+            retained_dyadic_power::Attachment::prepared(law),
+        ));
     }
 
     /// Wrap an already checked concrete attachment for private refusal fixtures.
@@ -53,18 +77,36 @@ impl RetainedLawAttachment {
     pub(in crate::loan) const fn expm1(&self) -> Result<&retained_expm1::Attachment, LoanError> {
         match &self.law {
             Some(RetainedLaw::Expm1(law)) => Ok(law),
-            None => Err(LoanError::WrongLoan),
+            Some(RetainedLaw::DyadicPower(_)) | None => Err(LoanError::WrongLoan),
+        }
+    }
+
+    /// Borrow the concrete dyadic law after rejecting an empty or foreign shell.
+    pub(in crate::loan) const fn dyadic_power(
+        &self,
+    ) -> Result<&retained_dyadic_power::Attachment, LoanError> {
+        match &self.law {
+            Some(RetainedLaw::DyadicPower(law)) => Ok(law),
+            Some(RetainedLaw::Expm1(_)) | None => Err(LoanError::WrongLoan),
         }
     }
 
     /// Check the retained use without granting a new one.
     pub(in crate::loan) fn validate(&self) -> Result<(), LoanError> {
-        self.expm1()?.validate()
+        match &self.law {
+            Some(RetainedLaw::Expm1(law)) => law.validate(),
+            Some(RetainedLaw::DyadicPower(law)) => law.validate(),
+            None => Err(LoanError::WrongLoan),
+        }
     }
 
     /// Check the live owner and debit witnesses of the retained use.
     pub(in crate::loan) fn validate_current(&self, heap: &Heap) -> Result<(), LoanError> {
-        self.expm1()?.validate_current(heap)
+        match &self.law {
+            Some(RetainedLaw::Expm1(law)) => law.validate_current(heap),
+            Some(RetainedLaw::DyadicPower(law)) => law.validate_current(heap),
+            None => Err(LoanError::WrongLoan),
+        }
     }
 
     /// Bind the retained use to the original expm1 operation.
@@ -76,9 +118,21 @@ impl RetainedLawAttachment {
         self.expm1()?.validate_binding(binding, bits)
     }
 
+    /// Bind the retained use to the exact dyadic owner and use seal.
+    pub(in crate::loan) fn validate_dyadic_binding(
+        &self,
+        binding: retained_dyadic_power::Binding,
+    ) -> Result<(), LoanError> {
+        self.dyadic_power()?.validate_binding(binding)
+    }
+
     /// Expose only the diagnostic owner identity of a filled attachment.
     pub(in crate::loan) fn owner_identity(&self) -> Result<u64, LoanError> {
-        Ok(self.expm1()?.owner_identity())
+        match &self.law {
+            Some(RetainedLaw::Expm1(law)) => Ok(law.owner_identity()),
+            Some(RetainedLaw::DyadicPower(law)) => Ok(law.owner_identity()),
+            None => Err(LoanError::WrongLoan),
+        }
     }
 
     /// Charge the private test fixture's added box to its existing bundle debit and cleanup.

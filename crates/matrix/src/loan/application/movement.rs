@@ -173,7 +173,7 @@ pub(super) fn check<P: Scalar + 'static>(
     }
     correspondence(source, map, &demand, budget)?;
     let work =
-        crate::kernels::contract::work(destination.components(), member.invocation_factor())?;
+        crate::kernels::contract::work(destination.components(), member.invocation_factor()?)?;
     let payload = destination
         .extent
         .entries()

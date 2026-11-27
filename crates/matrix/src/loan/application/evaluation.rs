@@ -145,7 +145,7 @@ fn validate<'a, P: Scalar + 'static>(
     core.evidence
         .validate_revision(&core.host.declaration, core.host.identity, 0)?;
     super::endpoints::validate_core(core)?;
-    let member = Member::check(
+    let member = Member::check_evidence(
         &core.evidence.operation,
         core.evidence.law.kind(),
         core.evidence.prepared.as_ref(),
@@ -165,11 +165,15 @@ fn validate<'a, P: Scalar + 'static>(
     Ok((member, seals))
 }
 /// Enumerate words, cells and components in stable original order, including refused suffixes.
+#[expect(
+    clippy::too_many_lines,
+    reason = "one selected traversal records all completion roles in order"
+)]
 fn run<P: Scalar + 'static>(
     core: &mut ApplicationCore<P>,
     permit: &Traversal,
 ) -> Result<(), LoanError> {
-    let member = Member::check(
+    let member = Member::check_evidence(
         &core.evidence.operation,
         core.evidence.law.kind(),
         core.evidence.prepared.as_ref(),
@@ -181,6 +185,17 @@ fn run<P: Scalar + 'static>(
                 .as_ref()
                 .ok_or(LoanError::WrongLoan)?
                 .expm1()?,
+        )
+    } else {
+        None
+    };
+    let retained_dyadic = if matches!(member, Member::PreparedDyadicPower(..)) {
+        Some(
+            core.host
+                .retained_law
+                .as_ref()
+                .ok_or(LoanError::WrongLoan)?
+                .dyadic_power()?,
         )
     } else {
         None
@@ -233,6 +248,7 @@ fn run<P: Scalar + 'static>(
                         right.as_ref(),
                         side.is_some_and(|side| side.source.symbols.bound().is_some()),
                         retained_expm1,
+                        retained_dyadic,
                         core.evidence.source.symbols.bound().is_some(),
                         source_cells,
                         component,

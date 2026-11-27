@@ -459,8 +459,10 @@ impl Heap {
                         .as_ref()
                         .is_some_and(|evidence| evidence.endpoint_tokens.binary().is_some()),
                 )
-                + super::retained_expm1::Attachment::WORK
-                    * usize::from(bundle.retained_law.is_some()),
+                + bundle
+                    .retained_law
+                    .as_ref()
+                    .map_or(0, |law| law.validation_work()),
         )?;
         self.validate_published_bundle(bundle)?;
         visit(channels + 1 + 3 * usize::from(bundle.endpoints.is_some()))?;

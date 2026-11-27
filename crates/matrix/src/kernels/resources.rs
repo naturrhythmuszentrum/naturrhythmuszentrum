@@ -17,6 +17,7 @@ impl KernelContract {
             }
             Recipe::Product => self.product_scratch::<P, Q>(),
             Recipe::PreparedExpm1
+            | Recipe::PreparedDyadicPower
             | Recipe::BinaryElementwise(_)
             | Recipe::CartesianBinary(..)
             | Recipe::ProjectedAffine(_) => Err(super::KernelError::Contract.into()),

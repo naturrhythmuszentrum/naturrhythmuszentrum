@@ -235,7 +235,9 @@ fn reciprocal_refuses_prepared_operation_overlay() -> TestResult {
         owner.core.host.retained_law = Some(Box::new(
             crate::loan::retained_law::RetainedLawAttachment::wrap_expm1(attachment),
         ));
-        owner.core.evidence.prepared = Some(prepared.request.operation);
+        owner.core.evidence.prepared = Some(
+            crate::loan::application::PreparedCorrespondence::Expm1(prepared.request.operation),
+        );
         fault::reset_reads();
         fault::reset_scalars();
         if publish {

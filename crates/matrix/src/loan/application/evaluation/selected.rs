@@ -27,7 +27,7 @@ impl Member<'_> {
             | Self::Reciprocal(_)
             | Self::SquareRoot(_)
             | Self::Binary(..) => Values::Closed([P::ZERO; 3]),
-            Self::PreparedExpm1(..) => Values::Prepared([0.0; 5]),
+            Self::PreparedExpm1(..) | Self::PreparedDyadicPower(..) => Values::Prepared([0.0; 5]),
         }
     }
     /// Exactly the admitted input loads and one native invocation occur at each selected component.
@@ -41,6 +41,7 @@ impl Member<'_> {
         right: Option<&crate::TileReader<'_, P>>,
         right_bounded: bool,
         law: Option<&crate::loan::retained_expm1::Attachment>,
+        dyadic_law: Option<&crate::loan::retained_dyadic_power::Attachment>,
         bounded: bool,
         cells: [usize; 2],
         component: usize,
@@ -78,6 +79,7 @@ impl Member<'_> {
                     | Self::ProjectedElementwise(..)
                     | Self::Square(_)
                     | Self::PreparedExpm1(..)
+                    | Self::PreparedDyadicPower(..)
                     | Self::Binary(..) => None,
                 };
                 closed(reader, bounded, cell, component, function, entry, permit)
@@ -99,8 +101,37 @@ impl Member<'_> {
             Self::PreparedExpm1(_, operation) => {
                 prepared(reader, law, operation, cell, component, permit)
             }
+            Self::PreparedDyadicPower(..) => dyadic(reader, dyadic_law, cell, component, permit),
         }
     }
+}
+/// The retained dyadic use evaluates the selected center once and keeps its lossless refusal.
+fn dyadic<P: Scalar + 'static>(
+    reader: Option<&crate::TileReader<'_, P>>,
+    law: Option<&crate::loan::retained_dyadic_power::Attachment>,
+    cell: usize,
+    component: usize,
+    permit: &Traversal,
+) -> Result<Values<P>, CellOutcome> {
+    let result = || {
+        let center = reader
+            .ok_or(nrz_scalar::DyadicPowerFailure::MalformedPlan)?
+            .read_prepaid(HostChannel::Center, cell, component, permit)
+            .map_err(|_| nrz_scalar::DyadicPowerFailure::MalformedPlan)?
+            .to_f64();
+        let law = law.ok_or(nrz_scalar::DyadicPowerFailure::MalformedPlan)?;
+        #[cfg(test)]
+        crate::loan::fault::entered_scalar();
+        let value = law.evaluate(center, &permit.context)?.reading();
+        Ok(Values::Prepared([
+            value.center,
+            value.total_radius,
+            value.numerical_error,
+            value.endpoints[0],
+            value.endpoints[1],
+        ]))
+    };
+    result().map_err(|reason| super::super::dyadic_refusal(component, reason))
 }
 /// The prepared member keeps its original funded use and unchanged result construction.
 fn prepared<P: Scalar + 'static>(

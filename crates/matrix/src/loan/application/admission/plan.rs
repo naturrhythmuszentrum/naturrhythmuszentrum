@@ -61,7 +61,7 @@ pub(super) struct Plan {
     pub(super) rounded: usize,
     /// Full detached core and private shared-owner headers.
     pub(super) headers: [usize; 5],
-    /// Number of accounting debit records, including the bundle's co-owned attachment.
+    /// Number of accounting debit records; the co-owned attachment adds bytes to the bundle debit, not another record.
     pub(super) debit_count: usize,
     /// Fixed indexed debit destinations.
     pub(super) debit_slots: [usize; 23],
@@ -124,7 +124,7 @@ impl Plan {
             rounded: slab_bytes::<P>(length)?,
         };
         let member = request.member()?;
-        let attachment_bytes = if member.is_prepared() {
+        let attachment_bytes = if member.has_retained_law() {
             size_of::<crate::loan::retained_law::RetainedLawAttachment>()
         } else {
             0

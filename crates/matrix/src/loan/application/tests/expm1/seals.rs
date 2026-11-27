@@ -26,9 +26,21 @@ fn alter(
             let [lower, upper] = core.endpoints.as_mut().ok_or("endpoints")?;
             std::mem::swap(&mut lower.tokens[0], &mut upper.tokens[0]);
         }
-        3 => core.evidence.prepared.as_mut().ok_or("operation")?.bits = 39,
+        3 => {
+            core.evidence
+                .prepared
+                .as_mut()
+                .and_then(|item| item.expm1_mut())
+                .ok_or("operation")?
+                .bits = 39;
+        }
         4 => {
-            let operation = core.evidence.prepared.as_mut().ok_or("operation")?;
+            let operation = core
+                .evidence
+                .prepared
+                .as_mut()
+                .and_then(|item| item.expm1_mut())
+                .ok_or("operation")?;
             operation.binding = super::laws::substituted_environment(operation.binding);
         }
         5 => core.endpoints = None,
@@ -137,6 +149,7 @@ fn prepared_current_origin_pairing_and_endpoint_authentication() -> TestResult {
                     .ok_or("origin")?
                     .prepared
                     .as_mut()
+                    .and_then(|item| item.expm1_mut())
                     .ok_or("operation")?
                     .bits = 39;
             }

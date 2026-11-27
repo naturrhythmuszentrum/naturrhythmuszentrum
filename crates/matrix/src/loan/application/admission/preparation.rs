@@ -299,7 +299,14 @@ fn extras<P: Scalar + 'static>(
     let auxiliary = auxiliary(request, plan, identity, debits, guard, endpoint_tokens)?;
     let evidence = Evidence {
         error_scope: request.member()?.error_scope(source.origin.error_scope()),
-        prepared: request.prepared.cloned(),
+        prepared: request.prepared.map(|reference| match reference {
+            super::super::prepared::PreparedReference::Expm1(operation) => {
+                super::super::PreparedCorrespondence::Expm1(operation.clone())
+            }
+            super::super::prepared::PreparedReference::DyadicPower(operation) => {
+                super::super::PreparedCorrespondence::DyadicPower(operation.binding)
+            }
+        }),
         endpoint_tokens: auxiliary,
         completed_mask: None,
         operation: request.operation.clone(),

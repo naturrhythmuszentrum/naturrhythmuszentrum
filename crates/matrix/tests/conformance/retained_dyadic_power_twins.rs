@@ -68,3 +68,26 @@
 //! fn escape(law: RetainedDyadicPower, context: &ArithmeticContext)
 //!     -> Result<DyadicPowerEvaluation<'static>, DyadicPowerFailure> { law.evaluate(1.0, context) }
 //! ```
+//!
+//! Checked original correspondence has no external field constructor.
+//! ```compile_fail,E0451
+//! use nrz_matrix::PreparedDyadicPowerOperation;
+//! fn forge() { let _operation = PreparedDyadicPowerOperation {
+//!     operation: panic!(), source: panic!(), destination: panic!(),
+//!     axis: panic!(), binding: panic!(),
+//! }; }
+//! ```
+//!
+//! The occupied retained-law attachment is private to the matrix owner.
+//! ```compile_fail,E0603
+//! use nrz_matrix::loan::retained_law::RetainedLawAttachment;
+//! fn forge() { let _attachment: RetainedLawAttachment = panic!(); }
+//! ```
+//!
+//! Completion has no external field constructor or setter.
+//! ```compile_fail,E0451
+//! use nrz_matrix::OwnedApplication;
+//! fn forge() { let _completion: OwnedApplication<f64> = OwnedApplication {
+//!     core: panic!(),
+//! }; }
+//! ```

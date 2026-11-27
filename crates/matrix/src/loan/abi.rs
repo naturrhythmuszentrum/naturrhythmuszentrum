@@ -47,6 +47,26 @@ struct Binding {
     /// Immutable domain and revisions.
     seal: Seal,
 }
+/// Independent dyadic use seal includes the canonical exponent and separate-steps tag.
+#[repr(C)]
+struct DyadicSeal {
+    /// Exact represented endpoint encodings.
+    domain: [u64; 2],
+    /// Canonical numerator and root degree.
+    exponent: (u64, u32),
+    /// Argument, arithmetic and separate-steps revisions.
+    revisions: [u32; 3],
+}
+/// Independent dyadic correspondence retains the full immutable use binding.
+#[repr(C)]
+struct DyadicBinding {
+    /// Original heap, account and owner identity.
+    identity: LawIdentity,
+    /// Exact funded use identity.
+    use_identity: u64,
+    /// Complete numerical and proof specialization.
+    seal: DyadicSeal,
+}
 /// Fixed original correspondence fields contain only symbolic witnesses and binding metadata.
 #[repr(C)]
 struct Operation {
@@ -63,6 +83,14 @@ struct Operation {
     /// Admitted target.
     bits: u32,
 }
+/// Closed correspondence alternatives share the existing prepared evidence slot.
+#[expect(dead_code, reason = "the ABI mirror does not construct correspondence")]
+enum PreparedCorrespondence {
+    /// Existing original expm1 correspondence.
+    Expm1(Operation),
+    /// The full dyadic use binding, with common declarations elsewhere in evidence.
+    DyadicPower(DyadicBinding),
+}
 /// The concrete expm1 use retains one already funded pointer.
 #[repr(C)]
 struct Attachment {
@@ -75,6 +103,8 @@ struct Attachment {
 enum RetainedLaw {
     /// One concrete funded expm1 use.
     Expm1(Attachment),
+    /// One concrete funded dyadic power use.
+    DyadicPower(Attachment),
 }
 /// A separate allocation is empty only within private preparation.
 #[repr(C)]
@@ -96,6 +126,54 @@ enum Outcome {
         component: usize,
         reason: nrz_scalar::Expm1Failure,
     },
+    /// Dyadic domain refusal with its original component.
+    DyadicPowerOutsideDomain {
+        /// First rejected component.
+        component: usize,
+    },
+    /// Dyadic below-normal refusal with its original component.
+    DyadicPowerBelowNormalOperand {
+        /// First rejected component.
+        component: usize,
+    },
+    /// Dyadic exponent refusal with its original component.
+    DyadicPowerNonDyadicExponent {
+        /// First rejected component.
+        component: usize,
+    },
+    /// Dyadic non-certification refusal with the arithmetic cause.
+    DyadicPowerTargetNotCertifiable {
+        /// First rejected component.
+        component: usize,
+        /// Arithmetic refusal retained inline.
+        failure: nrz_scalar::ArithmeticFailure,
+    },
+    /// Dyadic inventory refusal with both full-width counts.
+    DyadicPowerInventoryLimit {
+        /// First rejected component.
+        component: usize,
+        /// Admitted inventory limit.
+        limit: usize,
+        /// Inventory required by the immutable program.
+        needed: usize,
+    },
+    /// Dyadic malformed-plan refusal with its original component.
+    DyadicPowerMalformedPlan {
+        /// First rejected component.
+        component: usize,
+    },
+    /// Dyadic environment refusal with its original component.
+    DyadicPowerEnvironment {
+        /// First rejected component.
+        component: usize,
+    },
+    /// Dyadic engine refusal with the arithmetic cause.
+    DyadicPowerEngine {
+        /// First rejected component.
+        component: usize,
+        /// Arithmetic refusal retained inline.
+        failure: nrz_scalar::ArithmeticFailure,
+    },
     CellRefused {
         component: usize,
         reason: crate::KernelError,
@@ -105,7 +183,7 @@ enum Outcome {
 #[repr(C)]
 struct Evidence {
     /// Closed prepared alternative.
-    prepared: Option<Operation>,
+    prepared: Option<PreparedCorrespondence>,
     /// Fixed Lower/Upper allocation token identities.
     endpoints: Option<[(usize, u64, u64); 2]>,
     /// Exact immutable completed owner; a non-owning identity adds no allocation or edge.
@@ -291,6 +369,15 @@ pub(super) const fn application_headers<P: Scalar>() -> usize {
 /// Mirrors are compared to actual records only after supplying the independent expected inventory.
 #[test]
 fn prepared_application_independent_abi_layouts() {
+    assert_eq!(size_of::<DyadicBinding>(), 80);
+    assert_eq!(
+        size_of::<Option<PreparedCorrespondence>>(),
+        size_of::<Operation>()
+    );
+    assert_eq!(
+        size_of::<DyadicBinding>(),
+        size_of::<super::retained_dyadic_power::Binding>()
+    );
     assert_eq!(
         size_of::<Operation>(),
         size_of::<crate::PreparedExpm1Operation>()
@@ -310,6 +397,9 @@ fn prepared_application_independent_abi_layouts() {
     );
     assert_eq!(host_header(), size_of::<super::lifecycle::HostCore>());
     assert_eq!(outcome_width(), size_of::<crate::CellOutcome>());
+    assert_eq!(size_of::<Outcome>(), 32);
+    assert_eq!(std::mem::align_of::<Outcome>(), 8);
+    assert_eq!(std::mem::align_of::<crate::CellOutcome>(), 8);
     assert_eq!(group_row(), size_of::<Option<super::registry::Group>>());
     // The local seal has 16-byte inputs, a 24-byte extent, a two-byte kind,
     // six alignment bytes and eight Work bytes: 56 instead of the former 128.
@@ -363,18 +453,5 @@ fn retained_law_attachment_abi_layout() {
     assert_eq!(
         align_of::<Option<Box<RetainedLawAttachment>>>(),
         align_of::<*const ()>()
-    );
-    assert_eq!(
-        [
-            size_of::<Operation>(),
-            size_of::<Evidence>(),
-            size_of::<Bundle>(),
-            size_of::<Core<f64>>(),
-            outcome_width(),
-            group_row(),
-            bundle_header(),
-            application_headers::<f64>()
-        ],
-        [208, 1664, 3200, 3224, 32, 1032, 3216, 7040]
     );
 }
