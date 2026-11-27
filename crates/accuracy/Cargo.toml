@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: CC0-1.0
+[package]
+name = "nrz-accuracy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Dimension-neutral nonnegative bounds and conservative accuracy policies"
+readme = "README.md"
+keywords = ["numerics", "bounds", "validation"]
+categories = ["mathematics", "science"]

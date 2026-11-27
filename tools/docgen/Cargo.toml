@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: CC0-1.0
+[package]
+name = "nrz-docgen"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Deterministic documentation datasets, rendering, and fixed-point checks"
+readme = "README.md"
+keywords = ["documentation", "templates", "reproducibility"]
+categories = ["development-tools"]

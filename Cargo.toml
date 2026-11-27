@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: CC0-1.0
+[workspace]
+resolver = "3"
+members = [
+    "crates/engine",
+    "crates/scalar",
+    "crates/accuracy",
+    "crates/matrix",
+    "crates/bindings",
+    "crates/cas",
+    "tools/docgen",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2024"
+license = "AGPL-3.0-only"
+authors = ["Naturrhythmuszentrum"]
+repository = "https://github.com/naturrhythmuszentrum/naturrhythmuszentrum"

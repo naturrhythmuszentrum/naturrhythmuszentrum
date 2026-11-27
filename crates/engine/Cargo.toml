@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: CC0-1.0
+[package]
+name = "nrz"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Application-facing facade and command-line entry point of the Naturrhythmuszentrum physics calculation engine"
+readme = "README.md"
