@@ -281,6 +281,36 @@ fn retained_dyadic_power_inventory() -> TestResult {
     let [h, u, row] = bytes::headers();
     let e = bytes::evidence(law.authority()?)?;
     let parts = &law.frozen()?.parts;
+    let mut encoding_budget = Budget::new(fixture::limits())?;
+    let endpoint_bytes = [
+        law.authority()?
+            .judgment()
+            .interval()
+            .lower()
+            .canonical_bytes(&mut encoding_budget)?
+            .len(),
+        law.authority()?
+            .judgment()
+            .interval()
+            .upper()
+            .canonical_bytes(&mut encoding_budget)?
+            .len(),
+    ];
+    let authority_length = b"NRZ-DYADIC-AUTHORITY".len()
+        + 4
+        + 3 * 8
+        + parts.authority.proof_bytes().len()
+        + endpoint_bytes.into_iter().sum::<usize>()
+        + 8
+        + 4
+        + 2 * 8
+        + 2 * 4
+        + 1;
+    let lowering_length = b"NRZ-DYADIC-LOWERING".len() + 4 + 8 + authority_length + 2 + 1;
+    assert_eq!(parts.authority_key.len(), authority_length);
+    assert_eq!(parts.lowering_key.len(), lowering_length);
+    assert!(parts.authority_key.capacity() >= authority_length);
+    assert!(parts.lowering_key.capacity() >= lowering_length);
     let keys = parts.authority.proof_capacity()
         + parts.authority_key.capacity()
         + parts.lowering_key.capacity();
@@ -333,6 +363,8 @@ fn retained_dyadic_power_resources() -> TestResult {
     /// Exact resource scope for this isolated boundary.
     const AT: nrz_bindings::readings::algebra::Location =
         nrz_bindings::readings::algebra::Location::new("retained dyadic use boundary fixture");
+    public_constructor_boundary()?;
+    public_use_boundary()?;
     let [h, u, row] = bytes::headers();
     for warm in [false, true] {
         let mut heap = crate::Heap::new(HeapLimits::default())?;
@@ -449,6 +481,167 @@ fn retained_dyadic_power_resources() -> TestResult {
     complete_owner_boundary()?;
     public_preparation_refusals()?;
     Ok(())
+}
+
+/// Independently enumerate a public owner peak with a live graph and growing debit table.
+/// # Panics
+/// Panics only if the measured exact or one-below public outcome is internally inconsistent.
+fn public_constructor_boundary() -> TestResult {
+    let (mut producing, target, context) = warm_original()?;
+    let mut probe_work = 0;
+    let parts = crate::prepared_dyadic_power::owned_parts(
+        &mut producing,
+        &target,
+        &context,
+        [1.0, 2.0],
+        fixture::policy(),
+        fixture::scalar_limits(),
+        &ArithmeticContext::new()?,
+        &mut Budget::new(fixture::limits())?,
+        &mut |_| false,
+        &mut probe_work,
+    )?;
+    let evidence = bytes::evidence(&parts.authority)?;
+    let keys = parts.key_bytes()?;
+    let [header, use_header, row] = bytes::headers();
+    let occupied = 1025_usize;
+    let managed = header + evidence + keys + use_header + 2 * row + 2 * occupied * row;
+    let graph = producing.counts().payload_bytes;
+    let boundary = graph + u64::try_from(managed)?;
+    drop((parts, producing));
+    for short in [0, 1] {
+        let mut heap = crate::Heap::new(HeapLimits::default())?;
+        let mut account = crate::ExecutionAccount::new(Budget::new(nrz_bindings::Limits {
+            staged_payload_bytes: boundary - short,
+            ..fixture::limits()
+        })?)?;
+        let (seed, seed_target, seed_context) = warm_original()?;
+        let first = heap
+            .prepare_retained_dyadic_power(
+                seed,
+                &seed_target,
+                &seed_context,
+                [1.0, 2.0],
+                fixture::policy(),
+                fixture::scalar_limits(),
+                &ArithmeticContext::new()?,
+                &mut |_| false,
+                &mut account,
+            )
+            .map_err(|(error, _)| error)?;
+        let mut uses = Vec::new();
+        for _ in 0..1023 {
+            uses.push(heap.retain_retained_dyadic_power(&first, &mut account)?);
+        }
+        assert_eq!(heap.loans.debits.capacity(), occupied);
+        let (cas, target, context) = warm_original()?;
+        let before = heap.resource_bytes()?;
+        let result = heap.prepare_retained_dyadic_power(
+            cas,
+            &target,
+            &context,
+            [1.0, 2.0],
+            fixture::policy(),
+            fixture::scalar_limits(),
+            &ArithmeticContext::new()?,
+            &mut |_| false,
+            &mut account,
+        );
+        if short == 0 {
+            let law = result.map_err(|(error, _)| error)?;
+            assert_eq!(
+                heap.resource_bytes()? - before,
+                header + evidence + keys + use_header + 2 * row
+            );
+            assert!(law.authority()?.retained_bytes() > 0);
+        } else {
+            let (error, returned) = result.expect_err("one below public owner peak");
+            let crate::RetainedDyadicPowerError::Ownership(crate::LoanError::Budget(fault)) = error
+            else {
+                return Err(format!("{error:?}").into());
+            };
+            assert_eq!(
+                fault.kind,
+                nrz_bindings::readings::algebra::FaultKind::Exhausted {
+                    reason: nrz_bindings::readings::algebra::Exhaustion::Limit,
+                    budget: nrz_bindings::readings::algebra::limits::BudgetKind::StagedPayloadBytes,
+                    limit: u64::try_from(managed - 1)?,
+                    needed: u64::try_from(managed)?,
+                }
+            );
+            returned.expression(&target, &mut Budget::new(fixture::limits())?)?;
+            assert_eq!(heap.resource_bytes()?, before);
+        }
+        drop(uses);
+    }
+    Ok(())
+}
+
+/// Public further use exhausts the replacement peak after real debit occupancy.
+fn public_use_boundary() -> TestResult {
+    use nrz_bindings::readings::algebra::{Exhaustion, FaultKind, limits::BudgetKind};
+    let [_, use_header, row] = bytes::headers();
+    let occupied = 1025_usize;
+    let staged = use_header + row + 2 * occupied * row;
+    for short in [0, 1] {
+        let mut heap = crate::Heap::new(HeapLimits::default())?;
+        let mut account = crate::ExecutionAccount::new(Budget::new(nrz_bindings::Limits {
+            staged_payload_bytes: u64::try_from(staged - short)?,
+            ..fixture::limits()
+        })?)?;
+        let law = fixture::prepare_on(&mut heap, &mut account, false)?;
+        let mut uses = Vec::new();
+        for _ in 0..1023 {
+            uses.push(heap.retain_retained_dyadic_power(&law, &mut account)?);
+        }
+        assert_eq!(heap.loans.debits.capacity(), occupied);
+        let before = heap.resource_bytes()?;
+        let result = heap.retain_retained_dyadic_power(&law, &mut account);
+        if short == 0 {
+            let extra = result?;
+            assert_eq!(heap.resource_bytes()? - before, use_header + row);
+            drop(extra);
+        } else {
+            let crate::LoanError::Budget(fault) = result.expect_err("one below public use peak")
+            else {
+                return Err("typed public use refusal".into());
+            };
+            assert_eq!(
+                fault.kind,
+                FaultKind::Exhausted {
+                    reason: Exhaustion::Limit,
+                    budget: BudgetKind::StagedPayloadBytes,
+                    limit: u64::try_from(staged - 1)?,
+                    needed: u64::try_from(staged)?,
+                }
+            );
+            assert_eq!(heap.resource_bytes()?, before);
+        }
+        drop(uses);
+    }
+    Ok(())
+}
+
+/// Seed an ordinary checked enclosure on its own ledger without owning a result bundle.
+fn warm_original() -> TestResult<(
+    nrz_bindings::readings::algebra::Cas,
+    nrz_bindings::readings::algebra::Handle,
+    nrz_bindings::readings::algebra::Handle,
+)> {
+    let (mut cas, target, context) = fixture::original(1, 2)?;
+    let mut work = 0;
+    let _seed = nrz_bindings::DyadicPowerPreparation::prepare(
+        &mut cas,
+        &target,
+        &context,
+        [1.0, 2.0],
+        fixture::policy(),
+        &mut Budget::new(fixture::limits())?,
+        &mut |_| false,
+        &mut work,
+    )?;
+    assert!(work > 0);
+    Ok((cas, target, context))
 }
 
 /// Public early refusals return their graph and exactly the reached inspection prefix.
@@ -798,6 +991,7 @@ fn complete_owner_boundary() -> TestResult {
 )]
 #[test]
 fn retained_dyadic_power_lifetime() -> TestResult {
+    public_stopped_preparation()?;
     allocation_and_scan_prefixes()?;
     let (mut dyadic_heap, mut dyadic_account, dyadic_law) = fixture::prepare()?;
     let dyadic_slot = dyadic_heap
@@ -902,6 +1096,55 @@ fn retained_dyadic_power_lifetime() -> TestResult {
         heap.residence(&mut account, 1000)?,
         crate::Residence::Empty { .. }
     ));
+    Ok(())
+}
+
+/// A public second-round attempt keeps its first checked bound but refuses owner creation.
+/// # Panics
+/// Panics only if a genuine later Work stop is accepted or loses its returned graph.
+fn public_stopped_preparation() -> TestResult {
+    use nrz_bindings::DyadicPowerPreparationError;
+    use nrz_bindings::readings::algebra::enclosure::{EnclosureOutcome, UndecidedReason};
+    let (_, first_account, _) = fixture::prepare()?;
+    let one_round_work = first_account.usage().work;
+    let (cas, target, context) = fixture::original(1, 2)?;
+    let mut heap = crate::Heap::new(HeapLimits::default())?;
+    let mut account = crate::ExecutionAccount::new(Budget::new(nrz_bindings::Limits {
+        work: one_round_work,
+        ..fixture::limits()
+    })?)?;
+    let policy = nrz_bindings::readings::algebra::enclosure::RefinementPolicy {
+        rounds: 2,
+        ..fixture::policy()
+    };
+    let (error, returned) = heap
+        .prepare_retained_dyadic_power(
+            cas,
+            &target,
+            &context,
+            [1.0, 2.0],
+            policy,
+            fixture::scalar_limits(),
+            &ArithmeticContext::new()?,
+            &mut |_| false,
+            &mut account,
+        )
+        .expect_err("second refinement round exhausts original Work allowance");
+    let crate::RetainedDyadicPowerError::Preparation(crate::PreparedDyadicPowerError::Bindings(
+        DyadicPowerPreparationError::Stopped(report),
+    )) = error
+    else {
+        return Err("public stopped preparation changed phase".into());
+    };
+    assert_eq!(
+        report.outcome,
+        EnclosureOutcome::Undecided(UndecidedReason::WorkExhausted)
+    );
+    assert_eq!(report.completed_rounds, 1);
+    assert!(report.checked.is_some());
+    assert!(report.resource_fault.is_some());
+    returned.expression(&target, &mut Budget::new(fixture::limits())?)?;
+    assert!(heap.loans.debits.iter().all(Option::is_none));
     Ok(())
 }
 
