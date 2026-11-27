@@ -16,6 +16,20 @@ pub use clock_phase::{
     ClockPhaseVertex, ClockPhaseWitness,
 };
 pub use service::{Certificate, Receipt};
+/// Dynamic storage of the cloned original request.
+pub(super) fn timing_request_storage(request: &TimingRequest) -> u64 {
+    service::timing_request_storage(request)
+}
+/// Dynamic storage of the cloned original request.
+pub(super) fn clock_phase_request_storage(request: &ClockPhaseRequest) -> u64 {
+    clock_phase::clock_phase_request_storage(request)
+}
+/// Dynamic storage of the cloned original request.
+pub(super) fn timing_clock_phase_request_storage(request: &TimingClockPhaseRequest) -> u64 {
+    timing_clock_phase::timing_clock_phase_request_storage(request)
+}
+#[cfg(test)]
+pub(crate) use timing_clock_phase::tests::request as timing_clock_phase_test_request;
 pub use timing_clock_phase::{
     TimingClockPhaseCertificate, TimingClockPhaseEdge, TimingClockPhaseObservation,
     TimingClockPhaseReceipt, TimingClockPhaseRequest, TimingClockPhaseSourceKind,

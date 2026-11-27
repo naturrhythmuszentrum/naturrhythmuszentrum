@@ -6,11 +6,19 @@ mod claim;
 mod geometry;
 mod service;
 #[cfg(test)]
-mod tests;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the fixture is shared with the future-ray test module"
+)]
+pub(crate) mod tests;
 mod wire;
 
 use super::{PiAffine, QuotientTimestamp, SignPredicate};
 use crate::{Location, Rational, pi_bounds::PiBoundCertificate};
+/// Dynamic storage of the cloned original request.
+pub(super) fn timing_clock_phase_request_storage(request: &TimingClockPhaseRequest) -> u64 {
+    service::request_storage_bytes(request)
+}
 pub use service::{TimingClockPhaseCertificate, TimingClockPhaseReceipt};
 
 /// General timing and clock-phase fibre fault location.

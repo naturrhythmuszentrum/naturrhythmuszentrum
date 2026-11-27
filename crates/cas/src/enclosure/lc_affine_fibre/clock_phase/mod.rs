@@ -9,6 +9,10 @@ mod service;
 mod tests;
 mod wire;
 
+/// Dynamic storage of the cloned original request.
+pub(super) fn clock_phase_request_storage(request: &ClockPhaseRequest) -> u64 {
+    service::request_storage_bytes(request)
+}
 pub use service::{ClockPhaseCertificate, ClockPhaseReceipt};
 
 use super::{PiAffine, QuotientTimestamp, SignPredicate};

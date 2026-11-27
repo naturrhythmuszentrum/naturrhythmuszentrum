@@ -17,6 +17,10 @@ use std::sync::Arc;
 pub struct TimingClockPhaseCertificate(Vec<u8>);
 
 impl TimingClockPhaseCertificate {
+    /// Owned portable certificate bytes in the cloned original.
+    pub(crate) const fn storage_len(&self) -> u64 {
+        self.0.len() as u64
+    }
     /// Copy bounded untrusted bytes.
     /// # Errors
     /// Refuses exhausted resources.
@@ -435,20 +439,15 @@ fn retain(
     })
 }
 
-/// Logical byte inventory retained by one receipt, including vector bodies and exact components.
-pub(super) fn storage_bytes(
-    request: &TimingClockPhaseRequest,
-    topology: &TimingClockPhaseTopology,
-    signs: &Signs,
-    wire_len: usize,
-) -> u64 {
+/// Dynamic heap inventory of the cloned original request, without its embedded shell.
+pub(super) fn request_storage_bytes(request: &TimingClockPhaseRequest) -> u64 {
     fn rational(value: &crate::Rational) -> u64 {
         let (n, d) = value.component_bits();
         (n.saturating_add(7) / 8)
             .max(1)
             .saturating_add((d.saturating_add(7) / 8).max(1))
     }
-    let mut bytes = size_of::<TimingClockPhaseReceipt>() as u64;
+    let mut bytes = 0u64;
     bytes = bytes.saturating_add(
         (request.observations.len() * size_of::<super::TimingClockPhaseObservation>()) as u64,
     );
@@ -507,6 +506,23 @@ pub(super) fn storage_bytes(
     {
         bytes = bytes.saturating_add(rational(value));
     }
+    bytes
+}
+/// Logical byte inventory retained by one receipt, including vector bodies and exact components.
+pub(super) fn storage_bytes(
+    request: &TimingClockPhaseRequest,
+    topology: &TimingClockPhaseTopology,
+    signs: &Signs,
+    wire_len: usize,
+) -> u64 {
+    fn rational(value: &crate::Rational) -> u64 {
+        let (n, d) = value.component_bits();
+        (n.saturating_add(7) / 8)
+            .max(1)
+            .saturating_add((d.saturating_add(7) / 8).max(1))
+    }
+    let mut bytes = (size_of::<TimingClockPhaseReceipt>() as u64)
+        .saturating_add(request_storage_bytes(request));
     bytes = bytes.saturating_add(
         (topology.vertices.len() * size_of::<super::TimingClockPhaseVertex>()) as u64,
     );

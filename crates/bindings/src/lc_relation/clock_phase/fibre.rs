@@ -310,4 +310,46 @@ mod tests {
         ));
         Ok(())
     }
+
+    /// Exercise the complete binding inventory through the future-ray and horizon paths.
+    #[test]
+    fn lc_future_ray_binding_cheapest() -> TestResult {
+        use nrz_cas::enclosure::lc_future_ray::FutureRayForm;
+        let question = phase(false)?;
+        let mut cas = Cas::new(limits())?;
+        let b = &mut Budget::new(limits())?;
+        let pi = PiBoundCertificate {
+            version: 1,
+            terms: [2, 1],
+            sums: [q(74, 375, b)?, q(1, 239, b)?],
+            lower: q(128, 41, b)?,
+            upper: q(640, 203, b)?,
+        };
+        let reference = q(3, 1, b)?;
+        let before = b.usage().work;
+        let ray = question.affine_future_ray(
+            &mut cas,
+            FutureRayForm::Narrow,
+            &[vec![0, 0]],
+            &[[0, 0]; 2],
+            &[0],
+            &[1; 9],
+            &pi,
+            reference.clone(),
+            PiAffine::rational(reference.clone()),
+            false,
+            b,
+        )?;
+        let work = b.usage().work - before;
+        // Complete two-observation original and ray, with its 6,430-Work scope
+        // encoding charged once, with the cloned request inventoried separately.
+        assert_eq!(work, 2_858_612_197);
+        assert!(work > Limits::default().work);
+        assert!(ray.original().shares_allocation(question.relation()));
+        assert_ne!(ray.proposal(&cas, b)?.vertices.len(), 0);
+        assert_ne!(ray.certificate(&cas, b)?.to_bytes(b)?.len(), 0);
+        let horizon = ray.horizon(&cas, b)?;
+        assert_eq!(horizon.reference(), &reference);
+        Ok(())
+    }
 }

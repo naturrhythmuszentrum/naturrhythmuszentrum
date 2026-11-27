@@ -14,7 +14,7 @@ pub use calibrated_elements::{
 };
 mod calibrated_future;
 mod calibration;
-pub use calibrated_future::LcCalibratedFuture;
+pub use calibrated_future::{LcAffineFutureRay, LcCalibratedFuture};
 mod capacitance;
 mod clock;
 mod clock_phase;

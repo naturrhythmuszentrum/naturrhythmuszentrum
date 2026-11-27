@@ -460,3 +460,39 @@ impl LcHorizon {
             .saturating_add(self.relation().retained_payload_bytes())
     }
 }
+
+impl super::calibrated_future::LcAffineFutureRay {
+    /// Apply the existing exact full-turn width law to this checked whole future ray.
+    /// The current width checker accepts rational endpoint differences; symbolic pi
+    /// differences retain the checked ray and use the unresolved horizon fallback.
+    /// # Errors
+    /// Refuses foreign stores, unsupported symbolic widths or exhausted resources.
+    pub fn horizon(
+        &self,
+        cas: &nrz_cas::Cas,
+        budget: &mut Budget,
+    ) -> Result<PiWidthHorizon, LcRelationError> {
+        use nrz_cas::enclosure::lc_future_ray::FutureRaySource;
+        let proposal = self.receipt.proposal(cas, budget)?;
+        let low = &proposal.vertices[proposal.low as usize].point;
+        let high = &proposal.vertices[proposal.high as usize].point;
+        if low[0].pi != high[0].pi || low[1].pi != high[1].pi {
+            return Err(LcRelationError::Projection);
+        }
+        let width = [
+            high[1].base.sub(&low[1].base, budget)?,
+            high[0].base.sub(&low[0].base, budget)?,
+        ];
+        let authority = match &self.request.branches[0].source {
+            FutureRaySource::Timing(original, _) => &original.pi,
+            FutureRaySource::ClockPhase(original, _) => &original.pi,
+            FutureRaySource::TimingClockPhase(original, _) => &original.pi,
+        };
+        Ok(PiWidthHorizon::check(
+            width,
+            self.request.reference.clone(),
+            authority.check(budget)?,
+            budget,
+        )?)
+    }
+}

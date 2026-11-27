@@ -15,6 +15,10 @@ use std::sync::Arc;
 pub struct Certificate(Vec<u8>);
 
 impl Certificate {
+    /// Owned portable certificate bytes in the cloned original.
+    pub(crate) const fn storage_len(&self) -> u64 {
+        self.0.len() as u64
+    }
     /// Copy bounded hostile bytes without trusting their mathematical fields.
     /// # Errors
     /// Refuses exhausted caller witness and staging limits.
@@ -280,6 +284,65 @@ impl Cas {
             retain(candidate, expected, proposed, &certificate.0, b)
         })
     }
+}
+
+/// Dynamic heap inventory of the cloned original timing request, excluding its embedded shell.
+pub(super) fn timing_request_storage(request: &TimingRequest) -> u64 {
+    fn rational(value: &crate::Rational) -> u64 {
+        let (n, d) = value.component_bits();
+        (n.saturating_add(7) / 8)
+            .max(1)
+            .saturating_add((d.saturating_add(7) / 8).max(1))
+    }
+    let mut bytes = (request.observations.len() * size_of::<super::TimingObservation>()) as u64;
+    bytes = bytes.saturating_add((request.nominal.len() * size_of::<crate::Rational>()) as u64);
+    bytes = bytes
+        .saturating_add((request.source_order.len() * size_of::<super::TimingSourceSlot>()) as u64);
+    bytes = bytes.saturating_add((request.source_versions.len() * size_of::<u64>()) as u64);
+    bytes = bytes.saturating_add(request.epoch.len() as u64);
+    for ranges in [&request.rate_declarations, &request.initial_declarations] {
+        bytes = bytes.saturating_add((ranges.len() * size_of::<[crate::Rational; 2]>()) as u64);
+        for range in ranges {
+            bytes = bytes
+                .saturating_add(rational(&range[0]))
+                .saturating_add(rational(&range[1]));
+        }
+    }
+    for range in [&request.rate, &request.initial] {
+        bytes = bytes
+            .saturating_add(rational(&range[0]))
+            .saturating_add(rational(&range[1]));
+    }
+    for value in &request.nominal {
+        bytes = bytes.saturating_add(rational(value));
+    }
+    for observation in &request.observations {
+        for range in [&observation.time, &observation.phase] {
+            bytes = bytes
+                .saturating_add(rational(&range[0]))
+                .saturating_add(rational(&range[1]));
+        }
+        for ranges in [
+            &observation.time_declarations,
+            &observation.phase_declarations,
+        ] {
+            bytes = bytes.saturating_add((ranges.len() * size_of::<[crate::Rational; 2]>()) as u64);
+            for range in ranges {
+                bytes = bytes
+                    .saturating_add(rational(&range[0]))
+                    .saturating_add(rational(&range[1]));
+            }
+        }
+    }
+    for value in request
+        .pi
+        .sums
+        .iter()
+        .chain([&request.pi.lower, &request.pi.upper])
+    {
+        bytes = bytes.saturating_add(rational(value));
+    }
+    bytes
 }
 
 /// Charge and retain one checked store scoped timing receipt.

@@ -42,6 +42,7 @@ mod derivative;
 mod exp;
 mod interval;
 pub mod lc_affine_fibre;
+pub mod lc_future_ray;
 pub mod lc_root;
 pub mod lc_source_substitution;
 mod log;
@@ -220,7 +221,7 @@ pub use model::{
 pub use power::{PowerEvidence, PowerRoute};
 
 /// Closed formal register; no unimplemented analytic schema grants authority.
-pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 15] = [
+pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 16] = [
     crate::emptiness::LemmaSchema {
         name: "enclosure.rational-inclusion",
         label: "thm:cas:enclosure-rational-inclusion",
@@ -297,6 +298,7 @@ pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 15] = [
     lc_affine_fibre::SCHEMA,
     lc_affine_fibre::CLOCK_PHASE_SCHEMA,
     lc_affine_fibre::TIMING_CLOCK_PHASE_SCHEMA,
+    lc_future_ray::SCHEMA,
     lc_root::SCHEMA,
     lc_source_substitution::SCHEMA,
 ];

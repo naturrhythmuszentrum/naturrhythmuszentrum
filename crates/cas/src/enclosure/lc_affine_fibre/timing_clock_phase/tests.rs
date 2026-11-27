@@ -37,7 +37,12 @@ fn pi(b: &mut Budget) -> Result<PiBoundCertificate, Fault> {
         upper: q(640, 203, b)?,
     })
 }
-fn request() -> Result<TimingClockPhaseRequest, Fault> {
+/// Share the complete independent timing/clock/phase fixture with future-ray controls.
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the fixture is reexported for future-ray controls"
+)]
+pub(crate) fn request() -> Result<TimingClockPhaseRequest, Fault> {
     let b = &mut wide()?;
     let rate = [integer(1, b)?, integer(2, b)?];
     let initial = [integer(0, b)?, integer(1, b)?];
@@ -399,6 +404,16 @@ fn lc_affine_timing_clock_phase_decided_adjacent_turn() -> TestResult {
         FaultKind::Invalid(InvalidCode::UnsupportedCertificate)
     );
     assert_eq!(fault.location, AT);
+    let mut upper_adjacent = request()?;
+    upper_adjacent.observations[0].physical_declarations[0][0] = integer(-1, &mut wide()?)?;
+    let Err(fault) = claim::rows(&upper_adjacent, &mut wide()?) else {
+        panic!("the following turn is decided to intersect the physical interval");
+    };
+    assert_eq!(
+        fault.kind,
+        FaultKind::Invalid(InvalidCode::UnsupportedCertificate)
+    );
+    assert_eq!(fault.location, AT);
     Ok(())
 }
 
@@ -411,6 +426,15 @@ fn lc_affine_timing_clock_phase_lift_membership() -> TestResult {
     outside.observations[0].lift = 5;
     let Err(fault) = claim::rows(&outside, &mut wide()?) else {
         panic!("selected lift is outside its complete domain");
+    };
+    assert_eq!(
+        fault.kind,
+        FaultKind::Invalid(InvalidCode::UnsupportedCertificate)
+    );
+    assert_eq!(fault.location, AT);
+    outside.observations[0].lift = -5;
+    let Err(fault) = claim::rows(&outside, &mut wide()?) else {
+        panic!("selected lift is below its complete domain");
     };
     assert_eq!(
         fault.kind,
@@ -579,8 +603,8 @@ fn lc_affine_timing_clock_phase_resource_boundaries() -> TestResult {
     let receive_storage = replay - receive_pass.usage().work;
     assert_eq!(receive_storage, storage + 256);
     assert_eq!(
-        replay,
-        receive_scope + decoding + receive_verify + receive_predicates + receive_storage
+        [receive_scope, receive_verify, receive_predicates],
+        [scope_work, verification, predicates]
     );
     let mut unchanged_budget = wide()?;
     receipt.apply(&cas, &original, &mut unchanged_budget)?;

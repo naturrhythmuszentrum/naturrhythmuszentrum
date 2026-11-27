@@ -315,8 +315,8 @@ mod tests {
         expected_values
     }
 
-    #[test]
-    fn lc_affine_timing_binding_originals() -> TestResult {
+    /// Build the exact two-observation original shared by fibre and ray controls.
+    fn timing_fixture() -> Result<LcSampleTimes, Box<dyn std::error::Error>> {
         let mut b = Budget::new(Limits::default())?;
         let first = 0;
         let second = 1;
@@ -334,7 +334,42 @@ mod tests {
             .map(|(kind, [lo, hi])| admit::input(kind, [q(lo, &mut b)?, q(hi, &mut b)?], &mut b))
             .collect::<Result<Vec<_>, _>>()?;
         let relation = LcRelation::new("epoch".into(), 2, inputs, &mut b)?;
-        let timing = LcSampleTimes::new(relation, vec![Rational::zero(); 2], &mut b)?;
+        Ok(LcSampleTimes::new(
+            relation,
+            vec![Rational::zero(); 2],
+            &mut b,
+        )?)
+    }
+
+    /// Bind independent timing originals to the complete actual-time future ray.
+    #[test]
+    fn lc_future_ray_timing_binding() -> TestResult {
+        let timing = timing_fixture()?;
+        let mut cas = Cas::new(Limits::default())?;
+        let mut ray_budget = Budget::new(Limits::blind_cubic())?;
+        let ray_pi = pi(&mut ray_budget)?;
+        let ray = timing.affine_future_ray(
+            &mut cas,
+            &[vec![0, 0]],
+            &[[0, 0]; 2],
+            &[0],
+            &[1; 7],
+            &ray_pi,
+            q(1, &mut ray_budget)?,
+            PiAffine::rational(q(1, &mut ray_budget)?),
+            false,
+            &mut ray_budget,
+        )?;
+        assert!(ray.original().shares_allocation(timing.relation()));
+        assert_eq!(ray.proposal(&cas, &mut ray_budget)?.vertices.len(), 2);
+        let _horizon = ray.horizon(&cas, &mut ray_budget)?;
+        Ok(())
+    }
+
+    #[test]
+    fn lc_affine_timing_binding_originals() -> TestResult {
+        let timing = timing_fixture()?;
+        let first = 0;
         let mut b = Budget::new(Limits::blind_cubic())?;
         let request =
             timing.affine_timing_request(&[0, 0], &[[0, 0]; 2], &[1; 7], pi(&mut b)?, &mut b)?;
