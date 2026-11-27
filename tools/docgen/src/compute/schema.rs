@@ -807,7 +807,7 @@ pub(super) struct SummaryDataset {
     pub(super) namespace: String,
     /// Exact summary schema revision.
     pub(super) version: [u64; 3],
-    /// Estate owner.
+    /// Declared owner.
     pub(super) owner: String,
     /// Exported summary license.
     pub(super) license: String,

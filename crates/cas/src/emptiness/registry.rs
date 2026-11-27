@@ -6,7 +6,7 @@
 pub struct LemmaSchema {
     /// Formal schema name, independent of display text and local proof handles.
     pub name: &'static str,
-    /// Estate label of the theorem or hypothesis kind in the CAS guide.
+    /// Repository label of the theorem or hypothesis kind in the CAS guide.
     pub label: &'static str,
     /// Semantic revision of this schema's stated meaning and premises.
     pub version: u32,

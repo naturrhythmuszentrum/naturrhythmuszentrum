@@ -16,7 +16,7 @@ The public facade reexports documented value types and checked methods from priv
 
 Implementation adds CAS to `.linter/owners.toml` with a partition whose pattern is `[ %s"templates/" ] %s"crates/cas" [ "/" *VCHAR ]`. It adds all six existing owner activations to `.linter/policies.toml`: `labels.mints-well-formed`, `labels.mints-kind-conform`, `labels.mints-unique`, `labels.heads-conform`, `labels.citations-local-resolve` and `owners.reach-conform`. The matching six CAS entries in `.linter/lists.toml` each have an empty allowances array. No existing activation, allowance, owner or citation reach changes. The CAS README and source use locally resolving CAS labels; these NRZ design labels are cited by repository documents, not through a new cross-owner exception. Test labels follow their actual unit or integration location. Code is AGPL-3.0-only and documentation/data CC0-1.0.
 
-The literal README template and render, its document-manifest row, and the generated census and census-dependent README are updated when the crate lands. The generator's behavior and existing packages remain unchanged. Cargo.lock remains the seed file until the verification letter supplies exact replacement bytes. This design round adds only this template, its render and its manifest row.
+The literal README template and render, its document-manifest row, and the generated census and census-dependent README are updated when the crate lands. The generator's behavior and existing packages remain unchanged. Cargo.lock remains the seed file until the independent verification supplies exact replacement bytes. This design revision adds only this template, its render and its manifest row.
 
 ## Graph, syntax and source evidence · `sec:nrz:cas-design-graph`
 
@@ -455,7 +455,7 @@ The pure rational cut query `Cas::check_case_cut` checks a supplied closed box a
 
 These tests are derived here from field, derivative and graph invariants and the accepted examples, without copying another system's test data or code. Small deterministic enumeration replaces a new property-testing dependency. Small rational oracles use bounded integer arithmetic where their cross-products are independently known to fit; checked failure cases do not use an overflowing oracle. Polynomial acceptance compares explicit independently multiplied coefficient lists and hand derivatives as well as the production replay checker. Passing replay alone is necessary but insufficient to test a buggy shared arithmetic primitive. Error and exhaustion tests check both classification and absence of forbidden state publication.
 
-The crate's README states executable and unresolved scope and the local acceptance invocations. Source and integration tests receive their location-derived final documentation labels. The workspace gate still requires commit checks, formatting, clippy with warnings denied, rustdoc with warnings denied, tests, the generator fixed point and host label/format checks (`rule:vision:gate-of-record`), (`rule:nrz:required-verification`). The worker has no toolchain; the CAS-foundation step (`step:nrz:cas-foundation`) must report its static checks separately from the orchestrator's first compilation, then correct exact per-commit failures without declaring an unrun gate green.
+The crate's README states executable and unresolved scope and the local acceptance invocations. Source and integration tests receive their location-derived final documentation labels. The workspace gate still requires commit checks, formatting, clippy with warnings denied, rustdoc with warnings denied, tests, the generator fixed point and host label/format checks (`rule:vision:gate-of-record`), (`rule:nrz:required-verification`). Static checks made without a toolchain are reported separately from the first independent compilation, then correct exact per-commit failures without declaring an unrun gate green.
 
 **Step (CAS foundation)** · `step:nrz:cas-foundation`
 
@@ -463,7 +463,7 @@ The foundation supplies exact graph construction, conditional witnesses, bounded
 
 **Procedure (Four independently reviewable commits)** · `alg:nrz:cas-foundation-commits`
 
-The CAS-foundation step (`step:nrz:cas-foundation`) is bounded to the following four commits, targeted to one 7,200-second implementation round plus correction rounds. Each commit documents the behavior it actually exposes and has passing tests for that behavior; later algorithms return an honest unresolved outcome until their commit lands. Scratch commits are folded into these named units before shipping. The outline is an implementation budget, not permission to relax a checker when the time threshold is reached.
+The CAS-foundation step (`step:nrz:cas-foundation`) is bounded to the following four commits, targeted to one 7,200-second implementation period plus corrections. Each commit documents the behavior it actually exposes and has passing tests for that behavior; later algorithms return an honest unresolved outcome until their commit lands. Scratch commits are folded into these named units before shipping. The outline is an implementation budget, not permission to relax a checker when the time threshold is reached.
 
 |Commit|Buildable contents and acceptance|
 |------|---------------------------------|

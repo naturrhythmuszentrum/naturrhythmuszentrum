@@ -261,22 +261,22 @@ The reciprocal continuation discharges exactly its original NonZero(x) premise w
 
 **Requirement (LC sign attempt and publication limits)** · `req:nrz:decision-lc-sign-limits`
 
-Every attempt, failed cut, exact proof, π materialization or reuse and final publication consumes the caller's cumulative allowance; a retry cannot reset spent Work. Declare a finite maximum attempt count and preserve attempted boxes, original question, assumptions and usage when the result remains undecided. Admit and publish a complete selected continuation atomically after a final dependency check; a late resource refusal exposes no selected prefix. Evidence must cover f32/f64 below/above/resonance and zero-straddling twins, applicable negative-axis ownership, original nonzero discharge with unsafe numerical reciprocals still refused, source-only and radius-only retirement, and literal N/N−1 attempt/Work/staged/output limits with already consumed prefixes. Pins are measured on the lane seed without raising any limit or default (`req:nrz:decision-lifecycle-measurements`).
+Every attempt, failed cut, exact proof, π materialization or reuse and final publication consumes the caller's cumulative allowance; a retry cannot reset spent Work. Declare a finite maximum attempt count and preserve attempted boxes, original question, assumptions and usage when the result remains undecided. Admit and publish a complete selected continuation atomically after a final dependency check; a late resource refusal exposes no selected prefix. Evidence must cover f32/f64 below/above/resonance and zero-straddling twins, applicable negative-axis ownership, original nonzero discharge with unsafe numerical reciprocals still refused, source-only and radius-only retirement, and literal N/N−1 attempt/Work/staged/output limits with already consumed prefixes. Pins are measured on the implementation seed without raising any limit or default (`req:nrz:decision-lifecycle-measurements`).
 
 ## Implementation obligations and verification · `sec:nrz:decision-delivery`
 
 **Step (Certified membership and declared graph selection)** · `step:nrz:decision-certified-graph-selection`
 
-Objective/deliverable: implement the sole certified numerical-to-semantic path specified here, in the owner lanes below. Depend on live selected bindings, exact region/case rules, complete numerical enclosure evidence and original-expression checking; supply every missing exact checker before its consumer claims a certified decision. Preserve the float-only heap, immutable declarations, declared options, explicit undecided outcomes and acyclic feedback. The sequence is a dependency order, not a claim that all numerical kernels already have exportable CAS proofs.
+Objective/deliverable: implement the sole certified numerical-to-semantic path specified here, in the owner implementation units below. Depend on live selected bindings, exact region/case rules, complete numerical enclosure evidence and original-expression checking; supply every missing exact checker before its consumer claims a certified decision. Preserve the float-only heap, immutable declarations, declared options, explicit undecided outcomes and acyclic feedback. The sequence is a dependency order, not a claim that all numerical kernels already have exportable CAS proofs.
 
 **Requirement (Certified selection verification)** · `req:nrz:decision-selection-verification`
 
 Verification: independently authored exact certificates and expected judgments must cover each worked example, boundary ownership, false enclosure origins, inward endpoint conversion, stale/foreign identities, changed companion-only versions, missing partition members, sibling hypotheses, widened claims and scope mismatches. Exercise finite and parametric/unbounded declared families, out-of-domain integers, materialization overflow, indirect self-dependencies, atomic publication, bounded retry refusal, per-point undecided rows, compatible sharing and cross-point source retention. Fresh-process or admitted-machine runs may differ only in decided versus undecided for the same target; distinct certified options must be impossible. Every item remains an implementation obligation, with owner and minimal failing case below; document generation and label checks verify this specification's consistency, not these executable properties.
 
-**Table (Ordered implementation lanes)** · `tab:nrz:decision-implementation-lanes`
+**Table (Ordered implementation units)** · `tab:nrz:decision-implementation-units`
 
-|Statement|Lane and owner|
-|---------|--------------|
+|Statement|Implementation unit and owner|
+|---------|-----------------------------|
 |(`req:nrz:decision-owner-cas-judgments`)|Exact decision judgments and register; `nrz-cas`|
 |(`req:nrz:decision-owner-certificate-origins`)|Certificate origins; `nrz-scalar`, `nrz-matrix`, `nrz-cas`|
 |(`req:nrz:decision-owner-bindings-admission`)|Storage-neutral decision admission; `nrz-bindings`|
@@ -320,7 +320,7 @@ Owner: future `nrz-physics`, `nrz-matrix`, `nrz-bindings`. Contract to deliver: 
 
 **Requirement (Lifecycle measurement by owner)** · `req:nrz:decision-lifecycle-measurements`
 
-Each implementation lane measures its own new lifecycle: cumulative Work, staged/output/retained bytes, cache hits and misses, runtime and peak memory, with exact N/N−1 and prior-usage limits where applicable. CAS owns graph/certificate replay costs, bindings owns physical checks and evidence attachments, scalar owns enclosure arithmetic, matrix owns snapshot/version/storage and numerical execution, and physics owns plan/point scheduling. Refinement charges every attempt to the original allowance. These are measurement obligations; no runtime or allocation result is inferred from this design, and no CAS cost implementation is included.
+Each implementation unit measures its own new lifecycle: cumulative Work, staged/output/retained bytes, cache hits and misses, runtime and peak memory, with exact N/N−1 and prior-usage limits where applicable. CAS owns graph/certificate replay costs, bindings owns physical checks and evidence attachments, scalar owns enclosure arithmetic, matrix owns snapshot/version/storage and numerical execution, and physics owns plan/point scheduling. Refinement charges every attempt to the original allowance. These are measurement obligations; no runtime or allocation result is inferred from this design, and no CAS cost implementation is included.
 
 **Example (Ordinary native selection baseline costs)** · `ex:nrz:decision-native-selection-costs`
 

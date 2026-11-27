@@ -41,7 +41,7 @@ struct Dataset<'a> {
     namespace: &'a str,
     /// Version of the envelope and payload schema.
     version: [u32; 3],
-    /// Declared estate owner.
+    /// Declared owner.
     owner: &'a str,
     /// SPDX license identifier.
     license: &'a str,
@@ -277,7 +277,7 @@ fn invalid(path: &str, detail: &str) -> Error {
     }
 }
 
-/// Check the three-part estate label grammar.
+/// Check the three-part repository label grammar.
 pub(crate) fn valid_label(label: &str) -> bool {
     let parts: Vec<&str> = label.split(':').collect();
     parts.len() == 3

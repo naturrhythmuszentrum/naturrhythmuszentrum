@@ -14,7 +14,7 @@ use nrz_cas::proof::{
 use nrz_cas::syntax::{Draft, Operator, PredicateKind};
 use nrz_cas::{Cas, Handle, Reference};
 
-/// Every estate label agrees with its explicit standing, including unavailable schemas and cache reuse.
+/// Every repository label agrees with its explicit standing, including unavailable schemas and cache reuse.
 /// ´test:integration:formal-register-standing-is-complete´
 #[test]
 fn formal_register_standing_is_complete() {

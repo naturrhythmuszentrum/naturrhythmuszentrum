@@ -135,7 +135,7 @@ pub struct SummaryDataset {
     pub namespace: String,
     /// Exact summary schema revision.
     pub version: [u64; 3],
-    /// Estate owner.
+    /// Declared owner.
     pub owner: String,
     /// Exported summary license.
     pub license: String,

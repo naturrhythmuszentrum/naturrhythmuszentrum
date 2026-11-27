@@ -358,7 +358,7 @@ The admissible matrix powers, intermediate factor spaces, metric choices and com
 
 **Definition (Baseline and proposed tree)** · `def:vision:baseline-and-proposed-tree`
 
-The starting repository is a virtual nightly Cargo workspace with no members, a strict workspace lint configuration, an orchestration-linter snapshot assigning the root files and documents to one owner, and separate code and documentation/data licenses. The following packages are the target structure. Packages enter the workspace when they contain a coherent implemented responsibility, because empty scaffolding would create maintenance and documentation obligations without a usable boundary. Exemplars: none.
+The starting repository is a virtual nightly Cargo workspace with no members, a strict workspace lint configuration, a label-linter snapshot assigning the root files and documents to one owner, and separate code and documentation/data licenses. The following packages are the target structure. Packages enter the workspace when they contain a coherent implemented responsibility, because empty scaffolding would create maintenance and documentation obligations without a usable boundary. Exemplars: none.
 
 **Table (Packages and dependency direction)** · `tab:vision:package-structure`
 
@@ -373,7 +373,7 @@ The starting repository is a virtual nightly Cargo workspace with no members, a 
 |`crates/engine`, `nrz`|Curated application-facing exports and entry points|The public interfaces of the engine packages above|
 |`tools/docgen`, `nrz-docgen`|TOML ingestion, deterministic datasets, minijinja rendering, and fixed-point verification|Tooling dependencies on `nrz-bindings` and `nrz-cas`|
 
-Exemplars: (`ex:exemplars:faer`), (`ex:exemplars:herbie`), (`ex:exemplars:estate-tools-and-templated-documentation`).
+Exemplars: (`ex:exemplars:faer`), (`ex:exemplars:herbie`), (`ex:exemplars:shared-tools-and-templated-documentation`).
 
 **Decision (Early facade entry point)** · `dec:vision:early-facade-entry-point`
 
@@ -411,27 +411,27 @@ Tests combine small exact or independently bounded references, adversarial condi
 
 **Decision (Documentation layout)** · `dec:vision:documentation-layout`
 
-Each Markdown render has its minijinja template at `templates/{output}.j2`, mirroring the output path. Hand-edited TOML inputs live under `data/inputs/` and `data/problems/`, and generated JSON datasets live under `data/datasets/`. Root, documentation and package renders remain in their reader-facing locations. This arrangement keeps the source of an explanation discoverable without requiring all documentation to move away from the code it explains. Exemplars: (`ex:exemplars:estate-tools-and-templated-documentation`).
+Each Markdown render has its minijinja template at `templates/{output}.j2`, mirroring the output path. Hand-edited TOML inputs live under `data/inputs/` and `data/problems/`, and generated JSON datasets live under `data/datasets/`. Root, documentation and package renders remain in their reader-facing locations. This arrangement keeps the source of an explanation discoverable without requiring all documentation to move away from the code it explains. Exemplars: (`ex:exemplars:shared-tools-and-templated-documentation`).
 
 **Rule (Documentation envelope and derivation)** · `rule:vision:documentation-envelope-and-derivation`
 
-Each input envelope identifies its document or dataset, labels, ownership reference, license classification, and source relationships because rendering must preserve estate metadata as well as prose. Exact keys follow the orchestration linter’s actual schema once available. Derived JSON is reproducible from committed inputs, metadata, and fixtures; live clocks, network responses, unordered traversal, and live benchmark timing are excluded because they would prevent reproducible renders. Recorded measurements include their environment and provenance before entering documentation. Exemplars: (`ex:exemplars:estate-tools-and-templated-documentation`). Measurement provenance retains the platform scope of (`dec:vision:supported-platform`).
+Each input envelope identifies its document or dataset, labels, ownership reference, license classification, and source relationships because rendering must preserve envelope metadata as well as prose. Exact keys follow the label linter’s actual schema once available. Derived JSON is reproducible from committed inputs, metadata, and fixtures; live clocks, network responses, unordered traversal, and live benchmark timing are excluded because they would prevent reproducible renders. Recorded measurements include their environment and provenance before entering documentation. Exemplars: (`ex:exemplars:shared-tools-and-templated-documentation`). Measurement provenance retains the platform scope of (`dec:vision:supported-platform`).
 
 **Rule (Fixed-point gate and bootstrap)** · `rule:vision:fixed-point-gate-and-bootstrap`
 
-The documentation gate regenerates datasets and renders in an isolated output area, compares bytes and output inventory with the committed state, and verifies that another generation produces no change. This detects drift, stale outputs, and self-feeding transformations. The generator’s first usable commit includes its own documentation inputs, templates, and renders, together with the converted architecture document; the bootstrap therefore establishes the same rule that subsequent commits must obey. Exemplars: (`ex:exemplars:estate-tools-and-templated-documentation`).
+The documentation gate regenerates datasets and renders in an isolated output area, compares bytes and output inventory with the committed state, and verifies that another generation produces no change. This detects drift, stale outputs, and self-feeding transformations. The generator’s first usable commit includes its own documentation inputs, templates, and renders, together with the converted architecture document; the bootstrap therefore establishes the same rule that subsequent commits must obey. Exemplars: (`ex:exemplars:shared-tools-and-templated-documentation`).
 
 **Decision (Labels and ownership)** · `dec:vision:labels-and-ownership`
 
-Root policy remains with the declared root owner until an explicit partition update is committed. The proposed partition assigns each package subtree and each cross-cutting documentation or worked-problem subtree exactly one declared owner responsibility, with an actual estate owner resolved through the linter configuration. Ownership of templates, inputs, datasets, and renders follows their subtree responsibility. Labels remain stable across moves and use unique semantic identifiers because citations should survive changes in file layout. Exemplars: (`ex:exemplars:estate-tools-and-templated-documentation`).
+Root policy remains with the declared root owner until an explicit partition update is committed. The proposed partition assigns each package subtree and each cross-cutting documentation or worked-problem subtree exactly one declared owner responsibility, with an actual owner identity resolved through the linter configuration. Ownership of templates, inputs, datasets, and renders follows their subtree responsibility. Labels remain stable across moves and use unique semantic identifiers because citations should survive changes in file layout. Exemplars: (`ex:exemplars:shared-tools-and-templated-documentation`).
 
 **Rule (Metadata and licenses)** · `rule:vision:metadata-and-licenses`
 
-Every document and source carries the required labels and passes the orchestration linter because ownership and traceability apply to generated and handwritten material alike. Program code is AGPL-3.0-only; data and documentation are CC0-1.0. Generator logic, narrative content, fixtures, and outputs receive explicit classifications so a generated file does not accidentally inherit a tooling file’s metadata. Third-party material retains its applicable attribution and is not relabeled by generation. Exemplars: (`ex:exemplars:estate-tools-and-templated-documentation`).
+Every document and source carries the required labels and passes the label linter because ownership and traceability apply to generated and handwritten material alike. Program code is AGPL-3.0-only; data and documentation are CC0-1.0. Generator logic, narrative content, fixtures, and outputs receive explicit classifications so a generated file does not accidentally inherit a tooling file’s metadata. Third-party material retains its applicable attribution and is not relabeled by generation. Exemplars: (`ex:exemplars:shared-tools-and-templated-documentation`).
 
 **Rule (Gate of record)** · `rule:vision:gate-of-record`
 
-A green commit passes the pinned nightly formatter, the declared rustc and clippy posture, documentation checks, appropriate unit and integration tests, compile-time boundary acceptance and rejection with positive twins, implemented data-time algebraic checks and assembly-time block checks, orchestration linting, architecture checks, and documentation fixed-point verification (`req:vision:algebraic-unit-checks`). Relevant supported feature configurations are checked because inactive features can otherwise hide violations. Unsafe code remains forbidden; missing documentation, missing Debug implementations, unreachable public items, unwrap, unfinished placeholders, debugging macros, and print macros remain denied as specified. Routine tooling output uses an appropriate fallible I/O interface instead of weakening these rules. Exemplars: (`ex:exemplars:estate-tools-and-templated-documentation`).
+A green commit passes the pinned nightly formatter, the declared rustc and clippy posture, documentation checks, appropriate unit and integration tests, compile-time boundary acceptance and rejection with positive twins, implemented data-time algebraic checks and assembly-time block checks, label linting, architecture checks, and documentation fixed-point verification (`req:vision:algebraic-unit-checks`). Relevant supported feature configurations are checked because inactive features can otherwise hide violations. Unsafe code remains forbidden; missing documentation, missing Debug implementations, unreachable public items, unwrap, unfinished placeholders, debugging macros, and print macros remain denied as specified. Routine tooling output uses an appropriate fallible I/O interface instead of weakening these rules. Exemplars: (`ex:exemplars:shared-tools-and-templated-documentation`).
 
 **Rule (Meaningful commit series)** · `rule:vision:meaningful-commit-series`
 
@@ -475,7 +475,7 @@ Repeated eigenvalues, nonnormality, rank changes, and function-domain boundaries
 
 The first representative bodies, fields, constraints, and integration procedures are not specified. The physics-design portion selects worked problems that exercise homogeneous and heterogeneous assembly, coupled constraints, and measurable numerical sensitivity. Each problem states whether discretization and modeling error are bounded, estimated, or outside its guarantee, so numerical certification cannot be mistaken for complete physical validation.
 
-**Caveat (Estate schema and reproducibility)** · `cav:vision:estate-schema-and-reproducibility`
+**Caveat (Envelope schema and reproducibility)** · `cav:vision:ownership-schema-and-reproducibility`
 
 Exact envelope fields, source-label placement, and additional owner identities are unavailable at this architectural boundary. The documentation generator bite resolves them against the declared linter snapshot and proves the output fixed point. Numerical reproducibility is evaluated separately across execution settings: deterministic documentation is mandatory, while numerical reports must identify settings that can affect centers, certificates, and diagnostic experiments.
 

@@ -48,7 +48,7 @@ fn selected(budget: &mut Budget) -> TestResult<SelectedDecision> {
     Ok(result)
 }
 
-/// The lattice lane remeasures the scalar lifecycle, record closure and original-input association.
+/// The lattice implementation remeasures the scalar lifecycle, record closure and original-input association.
 /// ´test:integration:bindings-lattice-scalar-baseline´
 /// ´claim:bindings:lattice-scalar-baseline´ Four shared-signature symbol graphs and supplied-premise sizing account for `361_974` Work through association, with unchanged authentication and witness bytes.
 #[test]

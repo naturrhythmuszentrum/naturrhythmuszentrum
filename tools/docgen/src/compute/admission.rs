@@ -89,7 +89,7 @@ struct Index {
     namespace: String,
     /// Exact schema revision.
     version: [u64; 3],
-    /// Estate owner.
+    /// Declared owner.
     owner: String,
     /// Data license.
     license: String,

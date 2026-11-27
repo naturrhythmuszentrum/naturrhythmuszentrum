@@ -8,7 +8,7 @@ use crate::solving::SolveSchema;
 /// A formal primitive statement and its existing typed ordered-premise contract.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PrimitiveSchema {
-    /// Named theorem or reserved hypothesis schema with its estate label.
+    /// Named theorem or reserved hypothesis schema with its repository label.
     pub lemma: LemmaSchema,
     /// Exact premise shape used by the compiled checker dispatch.
     pub premises: PremiseShape,

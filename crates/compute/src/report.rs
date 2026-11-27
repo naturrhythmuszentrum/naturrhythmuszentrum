@@ -317,7 +317,7 @@ pub struct RunReport {
     pub namespace: String,
     /// Exact raw schema revision.
     pub version: [u64; 3],
-    /// Estate owner.
+    /// Declared owner.
     pub owner: String,
     /// Exported data license.
     pub license: String,

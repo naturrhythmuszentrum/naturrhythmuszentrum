@@ -170,7 +170,7 @@ Closes (`claim:nrz:lc-closing-scale-measurement`) only with its full evidence. G
 
 **Step (Independent LC closing review)** · `step:nrz:backlog-lc-independent-review`
 
-Enforces (`rule:nrz:lc-closing-independent-review`) after every closing claim is met, including the actual scale measurement and all four explained-overhead claims (`sec:nrz:lc-closing-certification-cost`). Review the whole repository at candidate main on a model other than the producers', reading the register, backlog, plan, LC designs and cited code/tests. Closing evidence: a recorded candidate commit and explicit `LC DONE` verdict. The alternative is labelled blocking findings that become or update backlog items and affected register standing; resolve them and repeat the independent review before closure. This is the final LC backlog item, not a substitute for any implementation or measurement evidence.
+Enforces (`rule:nrz:lc-closing-independent-review`) after every closing claim is met, including the actual scale measurement and all four explained-overhead claims (`sec:nrz:lc-closing-certification-cost`). Have a reviewer independently review the whole repository at candidate main, independent of the work’s authors and of the means used to produce it, reading the register, backlog, plan, LC designs and cited code/tests. Closing evidence: a recorded candidate commit and explicit `LC DONE` verdict. The alternative is labelled blocking findings that become or update backlog items and affected register standing; resolve them and repeat the independent review before closure. This is the final LC backlog item, not a substitute for any implementation or measurement evidence.
 
 ## Native failure investigation outside LC closing · `sec:nrz:backlog-native-failure-investigation`
 
