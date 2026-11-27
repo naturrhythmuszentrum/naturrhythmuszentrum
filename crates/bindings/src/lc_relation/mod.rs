@@ -125,6 +125,9 @@ pub enum LcRelationError {
     /// A candidate does not establish membership in every supplied constraint.
     #[error("LC relation witness containment is not proved")]
     Containment,
+    /// Native face containment refused a live sign predicate.
+    #[error("LC timing native sign containment refused: {0}")]
+    NativeContainment(#[from] crate::LcContainmentError),
     /// Phase and amplitude ratio have no physical value on the quiescent branch.
     #[error("LC relation quantity is undefined for the quiescent branch")]
     QuiescentPhase,

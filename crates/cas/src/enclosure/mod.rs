@@ -41,6 +41,7 @@ mod clamp;
 mod derivative;
 mod exp;
 mod interval;
+pub mod lc_affine_fibre;
 pub mod lc_root;
 pub mod lc_source_substitution;
 mod log;
@@ -219,7 +220,7 @@ pub use model::{
 pub use power::{PowerEvidence, PowerRoute};
 
 /// Closed formal register; no unimplemented analytic schema grants authority.
-pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 12] = [
+pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 13] = [
     crate::emptiness::LemmaSchema {
         name: "enclosure.rational-inclusion",
         label: "thm:cas:enclosure-rational-inclusion",
@@ -293,6 +294,7 @@ pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 12] = [
         premises: "Original `DomainGuard`, exact `Equality` at the common join, `Cover` of the constant and responsive regions, and `Enclosure` for values; generalized derivatives additionally require reconstructed `Differentiable` and `Derivative` premises on the complete responsive extension, with every strict domain retained.",
     },
     prepared_expm1::SCHEMA,
+    lc_affine_fibre::SCHEMA,
     lc_root::SCHEMA,
     lc_source_substitution::SCHEMA,
 ];

@@ -3,6 +3,7 @@
 
 mod admit;
 mod exact;
+mod fibre;
 mod outer;
 mod shared;
 
