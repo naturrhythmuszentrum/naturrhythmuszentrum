@@ -2,6 +2,7 @@
 //! Independent phase intervals and one systematic phase offset retain a common physical question.
 
 mod admit;
+mod fibre;
 mod future;
 mod project;
 mod witness;

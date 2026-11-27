@@ -3,12 +3,21 @@
 
 mod check;
 mod claim;
+mod clock_phase;
 mod service;
 #[cfg(test)]
 mod tests;
 mod wire;
 
+pub use clock_phase::{
+    ClockPhaseCertificate, ClockPhaseEdge, ClockPhaseObservation, ClockPhaseReceipt,
+    ClockPhaseRequest, ClockPhaseSourceKind, ClockPhaseSourceSlot, ClockPhaseTopology,
+    ClockPhaseVertex, ClockPhaseWitness,
+};
 pub use service::{Certificate, Receipt};
+
+/// Registered common-clock and common-phase fibre theorem.
+pub const CLOCK_PHASE_SCHEMA: crate::proof::LemmaSchema = clock_phase::SCHEMA;
 
 use crate::pi_bounds::PiBoundCertificate;
 use crate::{Location, Rational};

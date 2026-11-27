@@ -116,12 +116,15 @@ impl Topology {
 
 impl TimingRequest {
     /// Compare complete canonical originals with traversal and byte comparison charged.
+    /// A mismatched source-order/version length within either request returns false.
     /// # Errors
     /// Refuses exhausted caller resources.
     pub fn same_charged(&self, other: &Self, b: &mut Budget) -> Result<bool, Fault> {
         // Cover the two length checks here and their repeat in Receipt::apply.
         b.work(4, AT)?;
-        if self.source_order.len() != other.source_order.len()
+        if self.source_order.len() != self.source_versions.len()
+            || other.source_order.len() != other.source_versions.len()
+            || self.source_order.len() != other.source_order.len()
             || self.source_versions.len() != other.source_versions.len()
         {
             return Ok(false);
@@ -173,9 +176,8 @@ impl Receipt {
         if !Arc::ptr_eq(&self.owner, &cas.memo_owner) {
             return Err(Fault::invalid(InvalidCode::ForeignHandle, AT));
         }
-        // The charged canonical traversal covers every complete field comparison
-        // below when source-vector lengths match. A length mismatch refuses here,
-        // before those comparisons; same_charged prepays both length checks.
+        // The charged canonical traversal covers complete field comparison when
+        // source-vector lengths match; length tests precede deep comparisons.
         if current.same_charged(&self.original, b)? {
             return Ok((
                 Cow::Borrowed(&self.topology),
@@ -184,10 +186,7 @@ impl Receipt {
         }
         if current.source_order.len() != self.original.source_order.len()
             || current.source_versions.len() != self.original.source_versions.len()
-        {
-            return Err(claim::invalid());
-        }
-        if current.revision != self.original.revision
+            || current.revision != self.original.revision
             || current.pi != self.original.pi
             || current.epoch != self.original.epoch
             || current.nominal != self.original.nominal
@@ -195,7 +194,6 @@ impl Receipt {
             || current.rate_declarations.len() != self.original.rate_declarations.len()
             || current.initial_declarations.len() != self.original.initial_declarations.len()
             || current.observations.len() != self.original.observations.len()
-            || current.source_versions.len() != self.original.source_versions.len()
         {
             return Err(claim::invalid());
         }
