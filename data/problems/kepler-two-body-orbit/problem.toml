@@ -344,4 +344,4 @@ excluded = ["deterministic physical-input enclosure from a standard uncertainty"
 
 [stress]
 claims = ["rule:vision:local-and-observable-budgets", "def:vision:error-companion-surface", "rule:vision:imports-and-exactness"]
-bites = ["step:nrz:bite-exemplar-register", "step:nrz:bite-accuracy-and-benchmarks"]
+bites = ["step:nrz:increment-exemplar-register", "step:nrz:increment-accuracy-and-benchmarks"]

@@ -56,7 +56,7 @@ fingerprint = "784a070115c8c17d"
 
 [[source_versions]]
 path = "tools/docgen/src/check.rs"
-fingerprint = "af25fd69955bb04b"
+fingerprint = "d838ba8e9e88f63d"
 
 [[source_versions]]
 path = "tools/docgen/src/error.rs"

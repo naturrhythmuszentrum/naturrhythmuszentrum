@@ -60,7 +60,7 @@ Every repository Markdown file is a committed render of a minijinja template. Ch
 
 **Rule (Verify the documentation fixed point)** · `rule:nrz:document-fixed-point`
 
-Use `nrz-docgen data` to derive datasets, `nrz-docgen render` to render documents, and `nrz-docgen check` to verify the committed result. The check regenerates into an isolated output area, compares bytes and output inventory, and verifies that another generation produces no change. It exits 3 on drift. This catches edited renders, stale or missing outputs, and transformations that feed their own output back into later generations (`rule:vision:fixed-point-gate-and-bootstrap`), (`step:nrz:bite-documentation-generator`).
+Use `nrz-docgen data` to derive datasets, `nrz-docgen render` to render documents, and `nrz-docgen check` to verify the committed result. The check regenerates into an isolated output area, compares bytes and output inventory, and verifies that another generation produces no change. It exits 3 on drift. This catches edited renders, stale or missing outputs, and transformations that feed their own output back into later generations (`rule:vision:fixed-point-gate-and-bootstrap`), (`step:nrz:increment-documentation-generator`).
 
 **Rule (Stable labels and resolving citations)** · `rule:nrz:stable-labels-and-citations`
 

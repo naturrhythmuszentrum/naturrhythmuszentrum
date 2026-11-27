@@ -510,7 +510,7 @@ The matrix join is checked by `cargo test --locked -p nrz-matrix lc_omega_corres
 
 ## LC ownership and source evidence · `sec:nrz:descriptor-binding-ownership`
 
-**Table (Ownership of every LC matrix-bite obligation)** · `tab:nrz:descriptor-binding-obligations`
+**Table (Ownership of every LC matrix-increment obligation)** · `tab:nrz:descriptor-binding-obligations`
 
 |Obligation|Owner|Reason and executable boundary|
 |----------|-----|------------------------------|
@@ -524,7 +524,7 @@ The matrix join is checked by `cargo test --locked -p nrz-matrix lc_omega_corres
 |Entry companions read through each binding map, with both target versions|Matrix executes bindings-checked maps|Use abs(T) for radii and T*U*T^T for covariance, retain copy discrepancies and separate parameter error, and check finite payloads, PSD/enclosure and publication.|
 |Representation definition, conjugation and whole-family block structure|Bindings with CAS relation evidence|An exact map establishes the family and operation correspondence; center equality is insufficient.|
 |Physical normalization, reference/time scales, origins and spectral similarity|Bindings; the coordinate-lowering step (`step:nrz:lc-resonance-coordinate-lowering`) consumes the exact definitions|Problem, recipe or exact derivation declares fixed positive typed references; runtime operands cannot masquerade as source-free scales.|
-|Coefficient import, primitive outward arithmetic and format conversion|Scalar; matrix retains regions and error records; the LC-quantities step (`step:nrz:lc-resonance-quantity-bite`) owns certified irrational-constant export|The coordinate-lowering step (`step:nrz:lc-resonance-coordinate-lowering`) refuses required non-rational export until a certified enclosure exists; exact descriptor validity alone cannot supply one.|
+|Coefficient import, primitive outward arithmetic and format conversion|Scalar; matrix retains regions and error records; the LC-quantities step (`step:nrz:lc-resonance-quantity-increment`) owns certified irrational-constant export|The coordinate-lowering step (`step:nrz:lc-resonance-coordinate-lowering`) refuses required non-rational export until a certified enclosure exists; exact descriptor validity alone cannot supply one.|
 |Center/radius restoration, origin correction and both covariance-axis contractions|Matrix executes bindings-checked maps|Float procedures propagate total and numerical errors under the exact per-entry relations.|
 |Named mixed-coordinate norms and phasor residual/norm transfer|Bindings for references/correspondence; matrix for outward norm evaluation and float solve verification|The coordinate-lowering step (`step:nrz:lc-resonance-coordinate-lowering`) maps restored component bounds to a named dimensionless norm; the phasor-lowering step (`step:nrz:lc-resonance-phasor-lowering`) retains the matching induced norm and block transfer factors.|
 |Positive two-state spectrum, root completeness and original LC expected judgment|CAS for exact factor/selection/coverage evidence; bindings for physical transport|The exact theorem must concern the original L/C relation and its retained strict premises.|

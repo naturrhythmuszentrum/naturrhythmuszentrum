@@ -50,7 +50,7 @@ fn fixture(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
             "name = \"Fixture\"\n",
             "description = \"A fixture project.\"\n",
             "repository = \"https://example.invalid/fixture\"\n",
-            "bites = [{ id = \"step:nrz:bite-documentation-generator\", title = \"Documentation generator\" }]\n",
+            "bites = [{ id = \"step:nrz:increment-documentation-generator\", title = \"Documentation generator\" }]\n",
         ),
     )?;
     fs::write(
@@ -352,7 +352,7 @@ fn checks_complete_managed_inventory() -> Result<(), Box<dyn std::error::Error>>
         }
         fs::write(path, "unused\n")?;
     }
-    for ignored in [".git", "target", ".lane", "nested/target"] {
+    for ignored in [".cache", "target", "nested/.private", "nested/target"] {
         fs::create_dir_all(root.join(ignored))?;
         for name in ["ignored.md", "ignored.md.j2"] {
             fs::write(root.join(ignored).join(name), "ignored\n")?;

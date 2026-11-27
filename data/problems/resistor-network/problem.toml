@@ -230,4 +230,4 @@ excluded = ["resistor tolerance not declared as input uncertainty", "source noni
 
 [stress]
 claims = ["dec:vision:homogeneous-numerical-leaves", "rule:vision:heterogeneous-assembly", "rule:vision:verification-locations"]
-bites = ["step:nrz:bite-exemplar-register", "step:nrz:bite-units-design", "step:nrz:bite-certified-matrix-core", "step:nrz:bite-physics-core", "step:nrz:bite-accuracy-and-benchmarks"]
+bites = ["step:nrz:increment-exemplar-register", "step:nrz:increment-units-design", "step:nrz:increment-certified-matrix-core", "step:nrz:increment-physics-core", "step:nrz:increment-accuracy-and-benchmarks"]

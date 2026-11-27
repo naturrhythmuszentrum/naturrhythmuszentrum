@@ -385,4 +385,4 @@ excluded = ["deterministic coverage inferred from standard uncertainty", "varian
 
 [stress]
 claims = ["rule:vision:imports-and-exactness", "rule:vision:assurance-and-correlation", "def:vision:error-companion-surface"]
-bites = ["step:nrz:bite-exemplar-register", "step:nrz:bite-accuracy-and-benchmarks"]
+bites = ["step:nrz:increment-exemplar-register", "step:nrz:increment-accuracy-and-benchmarks"]

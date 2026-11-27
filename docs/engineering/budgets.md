@@ -50,4 +50,4 @@ Symbolic lowering will carry the caller's cumulative policy through original phy
 
 **Claim (Whole-plan resource acceptance)** · `claim:nrz:engineering-plan-resource-budget`
 
-The physics bite will retain aggregate node/retry work and shared invariant storage; the accuracy-and-benchmarks bite will compare observable error and cost under declared policies (`step:nrz:lc-resonance-physics-bite`), (`step:nrz:bite-accuracy-and-benchmarks`).
+The physics increment will retain aggregate node/retry work and shared invariant storage; the accuracy-and-benchmarks increment will compare observable error and cost under declared policies (`step:nrz:lc-resonance-physics-increment`), (`step:nrz:increment-accuracy-and-benchmarks`).

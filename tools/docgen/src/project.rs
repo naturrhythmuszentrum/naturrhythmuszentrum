@@ -33,13 +33,13 @@ const INPUT_NAMESPACE: &str = "org.naturrhythmuszentrum.docs.input.project";
 /// ´const:docgen:project-dataset-namespace-text-xa1cfe704´
 const DATASET_NAMESPACE: &str = "org.naturrhythmuszentrum.docs.dataset.project";
 
-/// One planned implementation bite.
+/// One planned implementation increment.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct Bite {
-    /// Stable bite identifier.
+struct Increment {
+    /// Stable increment identifier.
     id: String,
-    /// Human-readable bite title.
+    /// Human-readable increment title.
     title: String,
 }
 
@@ -53,8 +53,8 @@ struct Project {
     description: String,
     /// Project repository address.
     repository: String,
-    /// Planned bites in order.
-    bites: Vec<Bite>,
+    /// Planned increments in order.
+    bites: Vec<Increment>,
 }
 
 /// Derive the deterministic project dataset from its declared input.

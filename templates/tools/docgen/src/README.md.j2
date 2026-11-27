@@ -34,7 +34,7 @@ Envelope owners come from the linter owner declaration under `.linter/`; a separ
 |(`test:unit:rejects-invalid-envelopes`)|docgen|Reject missing fields, namespace and version errors, owners, and labels.|
 |(`test:unit:envelope-error-precedes-payload-error`)|docgen|Reserve envelope validation ahead of an invalid typed payload.|
 |(`test:unit:serializer-orders-fields-and-preserves-arrays`)|docgen|Serialize envelope keys first and sort nested objects without reordering arrays.|
-|(`test:unit:refuses-invalid-document-rows`)|docgen|Refuse source-directory outputs, escaping paths, and repeated outputs.|
+|(`test:unit:refuses-invalid-document-rows`)|docgen|Refuse outputs under source, hidden, and build directories or with escaping and duplicate paths; admit a hidden Markdown filename.|
 |(`test:unit:refuses-explicit-template-path`)|docgen|Refuse even a correctly mirrored template override in the manifest.|
 |(`test:unit:decodes-valid-problem-and-fixture`)|docgen|Decode one valid problem and one valid fixture into the ordered dataset.|
 |(`test:unit:layout-refuses-stray-file`)|docgen|Reject a stray file at the top of the problems tree.|
@@ -47,7 +47,7 @@ Envelope owners come from the linter owner declaration under `.linter/`; a separ
 |(`test:unit:units-refuse-unknown-key`)|docgen|Reject an undeclared descriptor field.|
 |(`test:unit:uncertainty-refuses-incomplete-shape`)|docgen|Reject an enclosure that omits its source. TODO ´todo:code:reject-missing-correlations-under-the-future´: reject missing correlations under the future shared-source contract without treating standard uncertainty as a radius under rule:vision:uncertainty-unit-algebra.|
 |(`test:unit:exactness-refuses-wrong-precision`)|docgen|Reject a decimal with fewer significant digits than declared.|
-|(`test:unit:labels-refuse-wrong-bite-kind`)|docgen|Reject a bite label outside the step and NRZ area.|
+|(`test:unit:labels-refuse-wrong-increment-kind`)|docgen|Reject a planning increment label outside the step and NRZ area.|
 |(`test:unit:envelope-precedes-payload-error`)|docgen|Report an invalid envelope before attempting to decode an invalid payload.|
 |(`test:unit:refuses-requirement-mismatch`)|docgen|Reject a declared dataset that differs from the manifest row.|
 |(`test:unit:refuses-wrong-dataset-major`)|docgen|Reject a template major that differs from the dataset's major.|

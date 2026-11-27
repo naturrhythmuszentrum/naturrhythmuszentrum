@@ -4,7 +4,7 @@
 //!
 //! | Test | Area | Claim |
 //! |------|------|-------|
-//! | [`refuses_invalid_document_rows`] | docgen | Refuse source-directory outputs, escaping paths, and repeated outputs. |
+//! | [`refuses_invalid_document_rows`] | docgen | Refuse outputs under source, hidden, and build directories or with escaping and duplicate paths; admit a hidden Markdown filename. |
 //! | [`refuses_explicit_template_path`] | docgen | Refuse even a correctly mirrored template override in the manifest. |
 
 //! The manifest of renders and their mirrored template sources.
@@ -92,7 +92,9 @@ pub(crate) fn read(root: &Path, owners: &BTreeSet<String>) -> Result<Vec<Documen
             || document
                 .output
                 .split('/')
-                .any(|part| matches!(part, ".git" | "target" | ".lane"))
+                .rev()
+                .skip(1)
+                .any(|part| part == "target" || part.starts_with('.'))
         {
             return Err(invalid(
                 &document.output,
@@ -181,7 +183,7 @@ mod tests {
         fs::write(root.join("data/documents.toml"), text)
     }
 
-    /// Refuse source-directory outputs, escaping paths, and repeated outputs.
+    /// Refuse outputs under source, hidden, and build directories or with escaping and duplicate paths; admit a hidden Markdown filename.
     /// ´claim:docgen:refuses-invalid-document-rows´
     /// ´test:unit:refuses-invalid-document-rows´
     #[test]
@@ -196,13 +198,15 @@ mod tests {
             ("/absolute.md", false),
             ("docs/design/../escape.md", false),
             ("docs/target/example.md", false),
-            (".git/example.md", false),
-            (".lane/example.md", false),
+            (".cache/example.md", false),
+            ("docs/.private/example.md", false),
             ("docs/design/example.md", true),
         ] {
             write_manifest(root, output, duplicate)?;
             assert!(matches!(read(root, &owners), Err(Error::Manifest { .. })));
         }
+        write_manifest(root, "docs/.md", false)?;
+        assert!(read(root, &owners).is_ok());
         Ok(())
     }
 

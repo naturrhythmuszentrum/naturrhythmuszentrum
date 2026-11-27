@@ -189,7 +189,7 @@ description = "tabulated two-norm condition number at order three"
 closed_form = "lambda_max(H_3)/lambda_min(H_3)"
 value = "524.1"
 value_kind = "decimal-4"
-derivation = "This is a literature value supplied by the dispatch, following standard Hilbert-matrix tables such as those in Higham's Accuracy and Stability of Numerical Algorithms. It is not derived here and is to be confirmed by the feasibility bite. Positive definiteness makes the eigenvalue ratio equal to the spectral condition number.\n"
+derivation = "This is a literature value taken from standard Hilbert-matrix tables such as those in Higham's Accuracy and Stability of Numerical Algorithms. It is not derived here and is to be confirmed by the feasibility increment. Positive definiteness makes the eigenvalue ratio equal to the spectral condition number.\n"
 second_route = "none"
 descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
 expression = { kind = "unsupported", text = "lambda_max(H_3)/lambda_min(H_3)", code = "matrix-spectral-declarations", reason = "Requires a shaped Hilbert matrix declaration and minimum/maximum eigenvalue operations; the scalar checker cannot bind H_3 or certify its spectral condition expression.", dependencies = ["n"], scope = ["expression"] }
@@ -200,7 +200,7 @@ description = "tabulated two-norm condition number at order four"
 closed_form = "lambda_max(H_4)/lambda_min(H_4)"
 value = "1.551e4"
 value_kind = "decimal-4"
-derivation = "This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.\n"
+derivation = "This is a literature value from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility increment.\n"
 second_route = "none"
 descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
 expression = { kind = "unsupported", text = "lambda_max(H_4)/lambda_min(H_4)", code = "matrix-spectral-declarations", reason = "Requires a shaped Hilbert matrix declaration and minimum/maximum eigenvalue operations; the scalar checker cannot bind H_4 or certify its spectral condition expression.", dependencies = ["n"], scope = ["expression"] }
@@ -211,7 +211,7 @@ description = "tabulated two-norm condition number at order five"
 closed_form = "lambda_max(H_5)/lambda_min(H_5)"
 value = "4.766e5"
 value_kind = "decimal-4"
-derivation = "This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.\n"
+derivation = "This is a literature value from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility increment.\n"
 second_route = "none"
 descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
 expression = { kind = "unsupported", text = "lambda_max(H_5)/lambda_min(H_5)", code = "matrix-spectral-declarations", reason = "Requires a shaped Hilbert matrix declaration and minimum/maximum eigenvalue operations; the scalar checker cannot bind H_5 or certify its spectral condition expression.", dependencies = ["n"], scope = ["expression"] }
@@ -222,7 +222,7 @@ description = "tabulated two-norm condition number at order six"
 closed_form = "lambda_max(H_6)/lambda_min(H_6)"
 value = "1.495e7"
 value_kind = "decimal-4"
-derivation = "This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.\n"
+derivation = "This is a literature value from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility increment.\n"
 second_route = "none"
 descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
 expression = { kind = "unsupported", text = "lambda_max(H_6)/lambda_min(H_6)", code = "matrix-spectral-declarations", reason = "Requires a shaped Hilbert matrix declaration and minimum/maximum eigenvalue operations; the scalar checker cannot bind H_6 or certify its spectral condition expression.", dependencies = ["n"], scope = ["expression"] }
@@ -233,7 +233,7 @@ description = "tabulated two-norm condition number at order seven"
 closed_form = "lambda_max(H_7)/lambda_min(H_7)"
 value = "4.754e8"
 value_kind = "decimal-4"
-derivation = "This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.\n"
+derivation = "This is a literature value from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility increment.\n"
 second_route = "none"
 descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
 expression = { kind = "unsupported", text = "lambda_max(H_7)/lambda_min(H_7)", code = "matrix-spectral-declarations", reason = "Requires a shaped Hilbert matrix declaration and minimum/maximum eigenvalue operations; the scalar checker cannot bind H_7 or certify its spectral condition expression.", dependencies = ["n"], scope = ["expression"] }
@@ -244,7 +244,7 @@ description = "tabulated two-norm condition number at order eight"
 closed_form = "lambda_max(H_8)/lambda_min(H_8)"
 value = "1.526e10"
 value_kind = "decimal-4"
-derivation = "This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.\n"
+derivation = "This is a literature value from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility increment.\n"
 second_route = "none"
 descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
 expression = { kind = "unsupported", text = "lambda_max(H_8)/lambda_min(H_8)", code = "matrix-spectral-declarations", reason = "Requires a shaped Hilbert matrix declaration and minimum/maximum eigenvalue operations; the scalar checker cannot bind H_8 or certify its spectral condition expression.", dependencies = ["n"], scope = ["expression"] }
@@ -277,7 +277,7 @@ expected = "The exact solution is six ones. Success is expected under the stated
 name = "order7-success"
 description = "last expected success among the supplied orders"
 overrides = { n = "7" }
-expected = "The exact solution is seven ones. Success is expected, with a narrower margin: kappa*u is about 5.3e-8 against a relative budget of 1e-6. Frobenius enclosure factors and the actual verification arithmetic matter at this order. The feasibility bite must confirm or correct this expectation from its recorded certificate.\n"
+expected = "The exact solution is seven ones. Success is expected, with a narrower margin: kappa*u is about 5.3e-8 against a relative budget of 1e-6. Frobenius enclosure factors and the actual verification arithmetic matter at this order. The feasibility increment must confirm or correct this expectation from its recorded certificate.\n"
 
 [[variants]]
 name = "order8-refusal"
@@ -292,4 +292,4 @@ excluded = ["a guarantee inferred from a literature condition estimate", "a sing
 
 [stress]
 claims = ["rule:vision:conditioning-and-refusal", "def:vision:operation-result-and-failure", "rule:vision:independent-numerical-evidence", "def:vision:certified-solve-contract", "dec:vision:inverse-norm-certificate"]
-bites = ["step:nrz:bite-exemplar-register", "step:nrz:bite-numerical-feasibility", "step:nrz:bite-certified-matrix-core", "step:nrz:bite-accuracy-and-benchmarks"]
+bites = ["step:nrz:increment-exemplar-register", "step:nrz:increment-numerical-feasibility", "step:nrz:increment-certified-matrix-core", "step:nrz:increment-accuracy-and-benchmarks"]

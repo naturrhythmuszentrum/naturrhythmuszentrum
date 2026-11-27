@@ -285,4 +285,4 @@ excluded = ["material and boundary-condition modelling error", "promotion of a d
 
 [stress]
 claims = ["def:vision:error-companion-surface", "rule:vision:canonical-quantities-and-affine-coordinates"]
-bites = ["step:nrz:bite-exemplar-register", "step:nrz:bite-units-design", "step:nrz:bite-accuracy-and-benchmarks"]
+bites = ["step:nrz:increment-exemplar-register", "step:nrz:increment-units-design", "step:nrz:increment-accuracy-and-benchmarks"]

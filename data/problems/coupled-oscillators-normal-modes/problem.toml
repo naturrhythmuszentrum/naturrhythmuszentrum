@@ -274,4 +274,4 @@ excluded = ["spring and mass modelling error", "uniqueness of individual vectors
 
 [stress]
 claims = ["rule:vision:spectral-guarantees", "req:vision:powers-and-factor-dimensions"]
-bites = ["step:nrz:bite-exemplar-register", "step:nrz:bite-units-design", "step:nrz:bite-advanced-matrix-domains", "step:nrz:bite-accuracy-and-benchmarks"]
+bites = ["step:nrz:increment-exemplar-register", "step:nrz:increment-units-design", "step:nrz:increment-advanced-matrix-domains", "step:nrz:increment-accuracy-and-benchmarks"]

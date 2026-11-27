@@ -101,4 +101,4 @@ The remaining owner documentation will register refusal variants and their execu
 
 **Claim (LC domain outcomes through reusable plans)** · `claim:nrz:engineering-lc-refusal-outcomes`
 
-Phasor, spectral, quantity and physics stages will retain successful independent outputs beside undefined, refused, blocked or inactive results, with complete entry coverage, checked binding overlap and explicit branch/domain evidence (`step:nrz:lc-resonance-phasor-lowering`), (`step:nrz:lc-resonance-spectral-lowering`), (`step:nrz:lc-resonance-quantity-bite`), (`step:nrz:lc-resonance-physics-bite`).
+Phasor, spectral, quantity and physics stages will retain successful independent outputs beside undefined, refused, blocked or inactive results, with complete entry coverage, checked binding overlap and explicit branch/domain evidence (`step:nrz:lc-resonance-phasor-lowering`), (`step:nrz:lc-resonance-spectral-lowering`), (`step:nrz:lc-resonance-quantity-increment`), (`step:nrz:lc-resonance-physics-increment`).

@@ -15,7 +15,7 @@
 //! | [`units_refuse_unknown_key`] | docgen | Reject an undeclared descriptor field. |
 //! | [`uncertainty_refuses_incomplete_shape`] | docgen | Reject an enclosure that omits its source. TODO ´todo:code:reject-missing-correlations-under-the-future´: reject missing correlations under the future shared-source contract without treating standard uncertainty as a radius under rule:vision:uncertainty-unit-algebra. |
 //! | [`exactness_refuses_wrong_precision`] | docgen | Reject a decimal with fewer significant digits than declared. |
-//! | [`labels_refuse_wrong_bite_kind`] | docgen | Reject a bite label outside the step and NRZ area. |
+//! | [`labels_refuse_wrong_increment_kind`] | docgen | Reject a planning increment label outside the step and NRZ area. |
 //! | [`envelope_precedes_payload_error`] | docgen | Report an invalid envelope before attempting to decode an invalid payload. |
 
 //! Discovery, validation, and derivation of reference problems and fixtures.
@@ -391,7 +391,7 @@ mod tests {
             "errors": {"bounded": [], "estimated": [], "excluded": []},
             "stress": {
                 "claims": ["rule:vision:example"],
-                "bites": ["step:nrz:bite-exemplar-register"]
+                "bites": ["step:nrz:increment-exemplar-register"]
             }
         })
     }
@@ -603,11 +603,11 @@ mod tests {
         invalid_sample(&value);
     }
 
-    /// Reject a bite label outside the step and NRZ area.
-    /// ´claim:docgen:labels-refuse-wrong-bite-kind´
-    /// ´test:unit:labels-refuse-wrong-bite-kind´
+    /// Reject a planning increment label outside the step and NRZ area.
+    /// ´claim:docgen:labels-refuse-wrong-increment-kind´
+    /// ´test:unit:labels-refuse-wrong-increment-kind´
     #[test]
-    fn labels_refuse_wrong_bite_kind() {
+    fn labels_refuse_wrong_increment_kind() {
         let mut value = sample();
         value["stress"]["bites"][0] = json!("rule:vision:example");
         invalid_sample(&value);

@@ -46,7 +46,7 @@ Each implemented crate's README introduces purpose, dependencies, the LC contrib
 
 Run the workspace benchmarks with `cargo bench -p nrz-bench`. For a short comparison, use `cargo bench -p nrz-bench -- --warm-up-time 1 --measurement-time 1`. The benchmark crate alone has a development dependency on Criterion; library builds and library tests retain the production sampling extraction. Its host explicitly prints sampling reports beside Criterion's harness output.
 
-The closed LC spectral path carries an explicitly declared original L/C covariance through the same exact Jacobian as the operator. Both signed root blocks retain first-order `LinearizedMoments` assurance, separate from deterministic complete-root bounds. Original source/model identities and all value and companion versions remain required; generic mapped source composition and quantity conversion retain their separate owners in the spectral-lowering step (`step:nrz:lc-resonance-spectral-lowering`) and LC-quantities step (`step:nrz:lc-resonance-quantity-bite`).
+The closed LC spectral path carries an explicitly declared original L/C covariance through the same exact Jacobian as the operator. Both signed root blocks retain first-order `LinearizedMoments` assurance, separate from deterministic complete-root bounds. Original source/model identities and all value and companion versions remain required; generic mapped source composition and quantity conversion retain their separate owners in the spectral-lowering step (`step:nrz:lc-resonance-spectral-lowering`) and LC-quantities step (`step:nrz:lc-resonance-quantity-increment`).
 
 ## LC target and plan · `sec:nrz:overview-plan`
 
@@ -57,9 +57,9 @@ For `L=25 mH` and `C=10 µF`, the independent reference answers include `ω₀=2
 - the descriptor-graph step (`step:nrz:lc-resonance-descriptor-graph`) and the region-bindings step (`step:nrz:lc-resonance-region-bindings`): graph-backed descriptors and representations and general versioned bindings and meaning-free kernel contracts.
 - the coordinate-lowering step (`step:nrz:lc-resonance-coordinate-lowering`) and the symbolic-lowering step (`step:nrz:lc-resonance-symbolic-lowering`): mixed-coordinate maps and complete restoration and cumulative symbolic policy and exact LC theorem transport.
 - the phasor-lowering step (`step:nrz:lc-resonance-phasor-lowering`), the spectral-lowering step (`step:nrz:lc-resonance-spectral-lowering`) and the numerical-acceptance step (`step:nrz:lc-resonance-numerical-acceptance`): checked phasor blocks, the positive two-state spectral theorem and integrated LC numerical acceptance.
-- LC quantities (`step:nrz:lc-resonance-quantity-bite`): quantities, certified π/phase evaluation and data-time binding for supported recipes.
-- LC plans (`step:nrz:lc-resonance-physics-bite`): reusable LC plans and shared-source frequency batches.
-- LC reproducibility (`step:nrz:lc-resonance-record-bite`): within-error reproducibility and environment provenance after the first physics slice.
+- LC quantities (`step:nrz:lc-resonance-quantity-increment`): quantities, certified π/phase evaluation and data-time binding for supported recipes.
+- LC plans (`step:nrz:lc-resonance-physics-increment`): reusable LC plans and shared-source frequency batches.
+- LC reproducibility (`step:nrz:lc-resonance-record-increment`): within-error reproducibility and environment provenance after the first physics slice.
 
 The design route retains the separate earlier symbolic proof-cost work and does not imply a general eigensolver, Complex numerical library or time integrator. The engine plan places LC closing before the coupled 2L2C target and advanced matrix domains (`sec:nrz:plan-order-and-dependencies`); the remaining LC work is ordered in (`sec:nrz:backlog-lc-closing`), with completion decided by (`sec:nrz:lc-closing-register`).
 
@@ -72,7 +72,7 @@ Repository Markdown is committed output from minijinja templates. Edit `template
 |Path|Role|
 |----|----|
 |`docs/design/descriptor-binding.md`|Two graphs, exact meanings, float storage, bindings and current migration gaps.|
-|`docs/design/lc-resonance.md`|LC model, independent answers, ownership and named implementation dependencies (`sec:nrz:lc-resonance-bites`).|
+|`docs/design/lc-resonance.md`|LC model, independent answers, ownership and named implementation dependencies (`sec:nrz:lc-resonance-increments`).|
 |`docs/design/architecture.md`|Project purpose, guarantees and package structure.|
 |`docs/design/matrix-core-design.md`, `docs/design/shapes.md`|Numerical enclosure, shape, companion and operation contracts.|
 |`docs/design/cas-design.md`, `docs/design/cas-solving-design.md`|Exact graph, proof, replay and solving contracts.|

@@ -486,4 +486,4 @@ excluded = ["parasitic resistance, nonlinear inductance/capacitance and other ph
 
 [stress]
 claims = ["rule:vision:semantic-kinds-and-roles", "rule:vision:measure-conversions", "rule:vision:heterogeneous-assembly", "rule:vision:spectral-guarantees", "rule:vision:independent-numerical-evidence"]
-bites = ["step:nrz:bite-exemplar-register", "step:nrz:bite-units-design", "step:nrz:bite-certified-matrix-core", "step:nrz:bite-units-and-foundations", "step:nrz:bite-physics-core", "step:nrz:bite-advanced-matrix-domains", "step:nrz:bite-accuracy-and-benchmarks"]
+bites = ["step:nrz:increment-exemplar-register", "step:nrz:increment-units-design", "step:nrz:increment-certified-matrix-core", "step:nrz:increment-units-and-foundations", "step:nrz:increment-physics-core", "step:nrz:increment-advanced-matrix-domains", "step:nrz:increment-accuracy-and-benchmarks"]

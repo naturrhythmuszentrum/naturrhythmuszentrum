@@ -10,8 +10,8 @@ LC resonance preserves Complex answers through named scalar components and docum
 
 The checked and unsupported columns count observable expressions in each entry. Unsupported values are never installed as substitute numerical inputs. Descriptor and relationship limitations are stated separately, including the unadmitted relative period uncertainty.
 
-|Entry|Kind|File|Parameters|Observables|Checked|Unsupported|Variants|Claims|Bites|
-|-----|----|----|----------|-----------|-------|-----------|--------|------|-----|
+|Entry|Kind|File|Parameters|Observables|Checked|Unsupported|Variants|Claims|Increments|
+|-----|----|----|----------|-----------|-------|-----------|--------|------|----------|
 {% for entry in problems.entries %}|{{ entry.problem.title }} (`{{ entry.problem.register }}`)|{{ entry.problem.kind }}|`{{ problems.sources[loop.index0] }}`|{{ entry.parameters | length }}|{{ entry.observables | length }}|{{ entry.validation.checked_observables }}|{{ entry.validation.unsupported_observables }}|{{ entry.variants | length }}|{% for label in entry.stress.claims %}{% if not loop.first %}, {% endif %}(`{{ label }}`){% endfor %}|{% for label in entry.stress.bites %}{% if not loop.first %}, {% endif %}(`{{ label }}`){% endfor %}|
 {% endfor %}
 Explicit limitations follow from the source records. Shape axes, shared source identities and batch axes remain later-version obligations (`def:nrz:companion-shape`), (`def:nrz:batch-axis`).

@@ -15,7 +15,7 @@ slug = "rump-polynomial"
 title = "Rump's polynomial"
 register = "cex:exemplars:rump-polynomial"
 kind = "fixture"
-model = "The dimensionless expression is 333.75*b^6+a^2*(11*a^2*b^2-b^6-121*b^4-2)+5.5*b^8+a/(2*b). Its polynomial coefficients are exact rationals: 333.75=1335/4 and 5.5=11/2. The quotient requires b!=0.\nThe measurement convention for naive evaluation is binary32 or binary64, round to nearest even, no fused multiply-add, no extended intermediates and no algebraic rewriting. Each power is formed by repeated multiplication from the base, starting with the first power. Products and sums are evaluated left to right within their precedence level, respecting the displayed parentheses; every elementary operation rounds to the selected format. The feasibility bite records the resulting floating-point outputs. No such output is asserted here.\n"
+model = "The dimensionless expression is 333.75*b^6+a^2*(11*a^2*b^2-b^6-121*b^4-2)+5.5*b^8+a/(2*b). Its polynomial coefficients are exact rationals: 333.75=1335/4 and 5.5=11/2. The quotient requires b!=0.\nThe measurement convention for naive evaluation is binary32 or binary64, round to nearest even, no fused multiply-add, no extended intermediates and no algebraic rewriting. Each power is formed by repeated multiplication from the base, starting with the first power. Products and sums are evaluated left to right within their precedence level, respecting the displayed parentheses; every elementary operation rounds to the selected format. The feasibility increment records the resulting floating-point outputs. No such output is asserted here.\n"
 instance = "Evaluate at a=77617 and b=33096. The exact polynomial part equals -2, while a/(2*b)=77617/66192, leaving a negative exact result. The precision selector is the significand bit count: 24 for binary32 and 53 for binary64.\n"
 
 [[kinds]]
@@ -95,13 +95,13 @@ expression = { kind = "algebra", text = "333.75*b^6+a^2*(11*a^2*b^2-b^6-121*b^4-
 name = "binary32-naive-and-validated"
 description = "measure naive binary32 and require honest validated behaviour"
 overrides = { precision_bits = "24" }
-expected = "The mathematical target remains -54767/66192. The feasibility bite measures the naive result under the explicitly stated evaluation convention; no particular floating-point output is prescribed.\nA validated path carries input, representation, arithmetic and verification contributions, including conversion accounting for any finite-precision imports. It either produces an enclosure containing -54767/66192 or refuses the requested guarantee. If an enclosure is too wide for the relative budget 1e-6, it may be retained as diagnostic evidence but must not be reported as budget success. Any claimed budget success requires a validated radius within that budget. A confident enclosure excluding the exact negative value is a defect.\n"
+expected = "The mathematical target remains -54767/66192. The feasibility increment measures the naive result under the explicitly stated evaluation convention; no particular floating-point output is prescribed.\nA validated path carries input, representation, arithmetic and verification contributions, including conversion accounting for any finite-precision imports. It either produces an enclosure containing -54767/66192 or refuses the requested guarantee. If an enclosure is too wide for the relative budget 1e-6, it may be retained as diagnostic evidence but must not be reported as budget success. Any claimed budget success requires a validated radius within that budget. A confident enclosure excluding the exact negative value is a defect.\n"
 
 [[variants]]
 name = "binary64-naive-and-validated"
 description = "measure naive binary64 under the same operation-order convention"
 overrides = { precision_bits = "53" }
-expected = "The exact target and validation requirements are unchanged. Increasing the ordinary precision is not itself a proof of correctness. Cancellation can make an unvalidated central value misleading even when the elementary inputs are exactly representable.\nThe accepted behaviours are a validated enclosure containing -54767/66192 with honest budget status, or a numerical refusal. A non-finite intermediate, unsupported arithmetic guarantee or bound exceeding the requested budget is handled as a failure of the requested guarantee. The feasibility bite records the measured naive output and the validated path's evidence separately.\n"
+expected = "The exact target and validation requirements are unchanged. Increasing the ordinary precision is not itself a proof of correctness. Cancellation can make an unvalidated central value misleading even when the elementary inputs are exactly representable.\nThe accepted behaviours are a validated enclosure containing -54767/66192 with honest budget status, or a numerical refusal. A non-finite intermediate, unsupported arithmetic guarantee or bound exceeding the requested budget is handled as a failure of the requested guarantee. The feasibility increment records the measured naive output and the validated path's evidence separately.\n"
 
 [errors]
 bounded = ["arithmetic and verification contributions when the validated path returns an enclosure", "representation contributions under the declared import policy"]
@@ -110,4 +110,4 @@ excluded = ["deterministic assurance inferred from naive evaluation", "truth inf
 
 [stress]
 claims = ["dec:vision:independent-verification-arithmetic", "def:vision:operation-result-and-failure", "rule:vision:independent-numerical-evidence"]
-bites = ["step:nrz:bite-exemplar-register", "step:nrz:bite-numerical-feasibility", "step:nrz:bite-units-and-foundations", "step:nrz:bite-accuracy-and-benchmarks"]
+bites = ["step:nrz:increment-exemplar-register", "step:nrz:increment-numerical-feasibility", "step:nrz:increment-units-and-foundations", "step:nrz:increment-accuracy-and-benchmarks"]

@@ -111,7 +111,7 @@ fn walk(root: &Path, directory: &Path, found: &mut BTreeSet<String>) -> Result<(
             error::io(&display, source)
         })?;
         if metadata.file_type().is_dir() {
-            if name != "target" && name != ".git" && name != ".lane" {
+            if name != "target" && !name.to_string_lossy().starts_with('.') {
                 walk(root, &path, found)?;
             }
             continue;

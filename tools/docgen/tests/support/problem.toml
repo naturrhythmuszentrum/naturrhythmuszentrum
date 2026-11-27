@@ -52,4 +52,4 @@ excluded = []
 
 [stress]
 claims = []
-bites = ["step:nrz:bite-exemplar-register"]
+bites = ["step:nrz:increment-exemplar-register"]

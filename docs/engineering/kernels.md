@@ -52,4 +52,4 @@ Region bindings will separate physical meaning from numerical contracts, and coo
 
 **Claim (Constant, phase and further domains)** · `claim:nrz:engineering-further-kernels`
 
-The quantity stage will connect exact constants to bounded numerical enclosures and branch-aware phase; the advanced-matrix bite will admit further numerical domains only with their own domain and perturbation arguments (`step:nrz:lc-resonance-quantity-bite`), (`step:nrz:bite-advanced-matrix-domains`).
+The quantity stage will connect exact constants to bounded numerical enclosures and branch-aware phase; the advanced-matrix increment will admit further numerical domains only with their own domain and perturbation arguments (`step:nrz:lc-resonance-quantity-increment`), (`step:nrz:increment-advanced-matrix-domains`).

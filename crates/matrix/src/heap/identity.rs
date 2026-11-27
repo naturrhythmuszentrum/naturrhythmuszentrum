@@ -68,11 +68,11 @@ category!(Value, "A published value region.");
 category!(Companion, "An independently described companion region.");
 category!(
     Factor,
-    "A factor resource category, reserved for the solve lanes."
+    "A factor resource category, reserved for matrix factorization results."
 );
 category!(
     Workspace,
-    "An unpublished workspace category, reserved for operation lanes."
+    "An unpublished workspace category, reserved for operations' scratch storage."
 );
 
 /// Slot and occupation generation, independent of physical storage location.

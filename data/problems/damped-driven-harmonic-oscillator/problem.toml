@@ -422,4 +422,4 @@ excluded = ["unproved deterministic bounds for a stepping method", "nonlinear sp
 
 [stress]
 claims = ["def:vision:error-companion-surface", "rule:vision:local-and-observable-budgets", "rule:vision:independent-numerical-evidence"]
-bites = ["step:nrz:bite-exemplar-register", "step:nrz:bite-physics-core", "step:nrz:bite-accuracy-and-benchmarks"]
+bites = ["step:nrz:increment-exemplar-register", "step:nrz:increment-physics-core", "step:nrz:increment-accuracy-and-benchmarks"]

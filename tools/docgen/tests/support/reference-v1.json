@@ -282,10 +282,10 @@
       },
       "stress": {
         "bites": [
-          "step:nrz:bite-exemplar-register",
-          "step:nrz:bite-units-design",
-          "step:nrz:bite-advanced-matrix-domains",
-          "step:nrz:bite-accuracy-and-benchmarks"
+          "step:nrz:increment-exemplar-register",
+          "step:nrz:increment-units-design",
+          "step:nrz:increment-advanced-matrix-domains",
+          "step:nrz:increment-accuracy-and-benchmarks"
         ],
         "claims": [
           "rule:vision:spectral-guarantees",
@@ -483,9 +483,9 @@
       },
       "stress": {
         "bites": [
-          "step:nrz:bite-exemplar-register",
-          "step:nrz:bite-physics-core",
-          "step:nrz:bite-accuracy-and-benchmarks"
+          "step:nrz:increment-exemplar-register",
+          "step:nrz:increment-physics-core",
+          "step:nrz:increment-accuracy-and-benchmarks"
         ],
         "claims": [
           "def:vision:error-companion-surface",
@@ -735,9 +735,9 @@
       },
       "stress": {
         "bites": [
-          "step:nrz:bite-exemplar-register",
-          "step:nrz:bite-units-design",
-          "step:nrz:bite-accuracy-and-benchmarks"
+          "step:nrz:increment-exemplar-register",
+          "step:nrz:increment-units-design",
+          "step:nrz:increment-accuracy-and-benchmarks"
         ],
         "claims": [
           "def:vision:error-companion-surface",
@@ -961,8 +961,8 @@
       },
       "stress": {
         "bites": [
-          "step:nrz:bite-exemplar-register",
-          "step:nrz:bite-accuracy-and-benchmarks"
+          "step:nrz:increment-exemplar-register",
+          "step:nrz:increment-accuracy-and-benchmarks"
         ],
         "claims": [
           "rule:vision:local-and-observable-budgets",
@@ -1355,8 +1355,8 @@
       },
       "stress": {
         "bites": [
-          "step:nrz:bite-exemplar-register",
-          "step:nrz:bite-accuracy-and-benchmarks"
+          "step:nrz:increment-exemplar-register",
+          "step:nrz:increment-accuracy-and-benchmarks"
         ],
         "claims": [
           "rule:vision:imports-and-exactness",
@@ -1623,11 +1623,11 @@
       },
       "stress": {
         "bites": [
-          "step:nrz:bite-exemplar-register",
-          "step:nrz:bite-units-design",
-          "step:nrz:bite-certified-matrix-core",
-          "step:nrz:bite-physics-core",
-          "step:nrz:bite-accuracy-and-benchmarks"
+          "step:nrz:increment-exemplar-register",
+          "step:nrz:increment-units-design",
+          "step:nrz:increment-certified-matrix-core",
+          "step:nrz:increment-physics-core",
+          "step:nrz:increment-accuracy-and-benchmarks"
         ],
         "claims": [
           "dec:vision:homogeneous-numerical-leaves",
@@ -1867,11 +1867,11 @@
       },
       "stress": {
         "bites": [
-          "step:nrz:bite-exemplar-register",
-          "step:nrz:bite-units-design",
-          "step:nrz:bite-certified-matrix-core",
-          "step:nrz:bite-physics-core",
-          "step:nrz:bite-accuracy-and-benchmarks"
+          "step:nrz:increment-exemplar-register",
+          "step:nrz:increment-units-design",
+          "step:nrz:increment-certified-matrix-core",
+          "step:nrz:increment-physics-core",
+          "step:nrz:increment-accuracy-and-benchmarks"
         ],
         "claims": [
           "rule:vision:heterogeneous-assembly",
@@ -1883,7 +1883,7 @@
       "variants": [
         {
           "description": "certification expectation for the base instance",
-          "expected": "Use binary64, round to nearest even, no fused multiply-add, LU with partial pivoting, and no refinement or higher precision. Import an exactly representable rational entry, including these integer and dyadic matrix entries, with zero representation radius; enclose only an inexact import such as Fy=1/1000 by half an ulp. Let rho bound the represented-center residual norm, rA and rB bound input perturbations, and xnorm bound the candidate norm. An approximate inverse Z supplies validated q>=norm_2(I-Z*A); if q<1, use g=norm_2(Z)/(1-q). The certified radius is R=g*(rho+rB+rA*xnorm)/(1-g*rA), provided g*rA<1. Success requires R/norm_2(xhat)<=relative_budget.\nSuccess is expected for the base condition number 667.111463346 and relative budget 1e-6: kappa*2^(-53) is about 7.4e-14, rA is zero for the exact matrix import, and the right-hand-side import radius is far below the budget after inverse amplification. The feasibility bite must record the actual validated q, residual, and radius; conditioning alone is not a certificate.\n",
+          "expected": "Use binary64, round to nearest even, no fused multiply-add, LU with partial pivoting, and no refinement or higher precision. Import an exactly representable rational entry, including these integer and dyadic matrix entries, with zero representation radius; enclose only an inexact import such as Fy=1/1000 by half an ulp. Let rho bound the represented-center residual norm, rA and rB bound input perturbations, and xnorm bound the candidate norm. An approximate inverse Z supplies validated q>=norm_2(I-Z*A); if q<1, use g=norm_2(Z)/(1-q). The certified radius is R=g*(rho+rB+rA*xnorm)/(1-g*rA), provided g*rA<1. Success requires R/norm_2(xhat)<=relative_budget.\nSuccess is expected for the base condition number 667.111463346 and relative budget 1e-6: kappa*2^(-53) is about 7.4e-14, rA is zero for the exact matrix import, and the right-hand-side import radius is far below the budget after inverse amplification. The feasibility increment must record the actual validated q, residual, and radius; conditioning alone is not a certificate.\n",
           "name": "base-certification",
           "overrides": {
             "kx": "1000"
@@ -2072,7 +2072,7 @@
         },
         {
           "closed_form": "lambda_max(H_3)/lambda_min(H_3)",
-          "derivation": "This is a literature value supplied by the dispatch, following standard Hilbert-matrix tables such as those in Higham's Accuracy and Stability of Numerical Algorithms. It is not derived here and is to be confirmed by the feasibility bite. Positive definiteness makes the eigenvalue ratio equal to the spectral condition number.\n",
+          "derivation": "This is a literature value taken from standard Hilbert-matrix tables such as those in Higham's Accuracy and Stability of Numerical Algorithms. It is not derived here and is to be confirmed by the feasibility increment. Positive definiteness makes the eigenvalue ratio equal to the spectral condition number.\n",
           "description": "tabulated two-norm condition number at order three",
           "name": "condition_order3",
           "second_route": "none",
@@ -2084,7 +2084,7 @@
         },
         {
           "closed_form": "lambda_max(H_4)/lambda_min(H_4)",
-          "derivation": "This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.\n",
+          "derivation": "This is a literature value from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility increment.\n",
           "description": "tabulated two-norm condition number at order four",
           "name": "condition_order4",
           "second_route": "none",
@@ -2096,7 +2096,7 @@
         },
         {
           "closed_form": "lambda_max(H_5)/lambda_min(H_5)",
-          "derivation": "This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.\n",
+          "derivation": "This is a literature value from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility increment.\n",
           "description": "tabulated two-norm condition number at order five",
           "name": "condition_order5",
           "second_route": "none",
@@ -2108,7 +2108,7 @@
         },
         {
           "closed_form": "lambda_max(H_6)/lambda_min(H_6)",
-          "derivation": "This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.\n",
+          "derivation": "This is a literature value from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility increment.\n",
           "description": "tabulated two-norm condition number at order six",
           "name": "condition_order6",
           "second_route": "none",
@@ -2120,7 +2120,7 @@
         },
         {
           "closed_form": "lambda_max(H_7)/lambda_min(H_7)",
-          "derivation": "This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.\n",
+          "derivation": "This is a literature value from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility increment.\n",
           "description": "tabulated two-norm condition number at order seven",
           "name": "condition_order7",
           "second_route": "none",
@@ -2132,7 +2132,7 @@
         },
         {
           "closed_form": "lambda_max(H_8)/lambda_min(H_8)",
-          "derivation": "This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.\n",
+          "derivation": "This is a literature value from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility increment.\n",
           "description": "tabulated two-norm condition number at order eight",
           "name": "condition_order8",
           "second_route": "none",
@@ -2177,10 +2177,10 @@
       },
       "stress": {
         "bites": [
-          "step:nrz:bite-exemplar-register",
-          "step:nrz:bite-numerical-feasibility",
-          "step:nrz:bite-certified-matrix-core",
-          "step:nrz:bite-accuracy-and-benchmarks"
+          "step:nrz:increment-exemplar-register",
+          "step:nrz:increment-numerical-feasibility",
+          "step:nrz:increment-certified-matrix-core",
+          "step:nrz:increment-accuracy-and-benchmarks"
         ],
         "claims": [
           "rule:vision:conditioning-and-refusal",
@@ -2225,7 +2225,7 @@
         },
         {
           "description": "last expected success among the supplied orders",
-          "expected": "The exact solution is seven ones. Success is expected, with a narrower margin: kappa*u is about 5.3e-8 against a relative budget of 1e-6. Frobenius enclosure factors and the actual verification arithmetic matter at this order. The feasibility bite must confirm or correct this expectation from its recorded certificate.\n",
+          "expected": "The exact solution is seven ones. Success is expected, with a narrower margin: kappa*u is about 5.3e-8 against a relative budget of 1e-6. Frobenius enclosure factors and the actual verification arithmetic matter at this order. The feasibility increment must confirm or correct this expectation from its recorded certificate.\n",
           "name": "order7-success",
           "overrides": {
             "n": "7"
@@ -2511,18 +2511,18 @@
       "problem": {
         "instance": "At order three, K=[[1,-3/5,-3/5],[0,4/5,-12/25],[0,0,16/25]], with right-hand side [-1/5,8/25,16/25]^T. Its inverse is [[1,3/4,3/2],[0,5/4,15/16],[0,0,25/16]].\nAt order three, W=[[1,0,1],[-1,1,1],[-1,-1,1]], with right-hand side [2,1,-1]^T. For general order, the Wilkinson right-hand side is b_i=3-i for i<n and b_n=2-n.\n",
         "kind": "fixture",
-        "model": "The Kahan matrix is K_n=D*U, where D=diag(1,s,...,s^(n-1)), U has unit diagonal, entries -c above the diagonal and zero entries below it, and c^2+s^2=1. The fixed angle has c=3/5 and s=4/5. Every column has Euclidean norm one, while an unpivoted QR factorisation has Q=I and R=K_n.\nThe Wilkinson construction here is the Gaussian-elimination partial-pivoting growth matrix: diagonal entries are one, entries below the diagonal are minus one, the last column is all ones, and remaining entries are zero. Equal-magnitude pivot candidates are resolved by choosing the smallest row index, so elimination makes no row swaps. This is the growth construction, rather than the symmetric tridiagonal eigenvalue example, because the fixture stresses elimination growth and factorisation choices.\nFor both matrices the exact right-hand side is the matrix times the all-ones vector. Certification uses binary64, round to nearest even, no fused multiply-add, LU with partial pivoting, exact import for binary64-representable entries and half-ulp enclosures only for inexact imports, and no recovery. With q>=norm_2(I-Z*A), use g=norm_2(Z)/(1-q) only if q<1. With validated rho,rA,rB,xnorm, use R=g*(rho+rB+rA*xnorm)/(1-g*rA) only if g*rA<1. Success requires R/norm_2(xhat)<=relative_budget. All outcome predictions remain expectations to be confirmed or corrected by the feasibility bite.\n",
+        "model": "The Kahan matrix is K_n=D*U, where D=diag(1,s,...,s^(n-1)), U has unit diagonal, entries -c above the diagonal and zero entries below it, and c^2+s^2=1. The fixed angle has c=3/5 and s=4/5. Every column has Euclidean norm one, while an unpivoted QR factorisation has Q=I and R=K_n.\nThe Wilkinson construction here is the Gaussian-elimination partial-pivoting growth matrix: diagonal entries are one, entries below the diagonal are minus one, the last column is all ones, and remaining entries are zero. Equal-magnitude pivot candidates are resolved by choosing the smallest row index, so elimination makes no row swaps. This is the growth construction, rather than the symmetric tridiagonal eigenvalue example, because the fixture stresses elimination growth and factorisation choices.\nFor both matrices the exact right-hand side is the matrix times the all-ones vector. Certification uses binary64, round to nearest even, no fused multiply-add, LU with partial pivoting, exact import for binary64-representable entries and half-ulp enclosures only for inexact imports, and no recovery. With q>=norm_2(I-Z*A), use g=norm_2(Z)/(1-q) only if q<1. With validated rho,rA,rB,xnorm, use R=g*(rho+rB+rA*xnorm)/(1-g*rA) only if g*rA<1. Success requires R/norm_2(xhat)<=relative_budget. All outcome predictions remain expectations to be confirmed or corrected by the feasibility increment.\n",
         "register": "ex:exemplars:kahan-and-wilkinson-matrices",
         "slug": "kahan-and-wilkinson-matrices",
         "title": "Kahan and Wilkinson matrices"
       },
       "stress": {
         "bites": [
-          "step:nrz:bite-exemplar-register",
-          "step:nrz:bite-numerical-feasibility",
-          "step:nrz:bite-certified-matrix-core",
-          "step:nrz:bite-advanced-matrix-domains",
-          "step:nrz:bite-accuracy-and-benchmarks"
+          "step:nrz:increment-exemplar-register",
+          "step:nrz:increment-numerical-feasibility",
+          "step:nrz:increment-certified-matrix-core",
+          "step:nrz:increment-advanced-matrix-domains",
+          "step:nrz:increment-accuracy-and-benchmarks"
         ],
         "claims": [
           "dec:vision:factorizations-and-scaling",
@@ -2669,17 +2669,17 @@
       "problem": {
         "instance": "Evaluate at a=77617 and b=33096. The exact polynomial part equals -2, while a/(2*b)=77617/66192, leaving a negative exact result. The precision selector is the significand bit count: 24 for binary32 and 53 for binary64.\n",
         "kind": "fixture",
-        "model": "The dimensionless expression is 333.75*b^6+a^2*(11*a^2*b^2-b^6-121*b^4-2)+5.5*b^8+a/(2*b). Its polynomial coefficients are exact rationals: 333.75=1335/4 and 5.5=11/2. The quotient requires b!=0.\nThe measurement convention for naive evaluation is binary32 or binary64, round to nearest even, no fused multiply-add, no extended intermediates and no algebraic rewriting. Each power is formed by repeated multiplication from the base, starting with the first power. Products and sums are evaluated left to right within their precedence level, respecting the displayed parentheses; every elementary operation rounds to the selected format. The feasibility bite records the resulting floating-point outputs. No such output is asserted here.\n",
+        "model": "The dimensionless expression is 333.75*b^6+a^2*(11*a^2*b^2-b^6-121*b^4-2)+5.5*b^8+a/(2*b). Its polynomial coefficients are exact rationals: 333.75=1335/4 and 5.5=11/2. The quotient requires b!=0.\nThe measurement convention for naive evaluation is binary32 or binary64, round to nearest even, no fused multiply-add, no extended intermediates and no algebraic rewriting. Each power is formed by repeated multiplication from the base, starting with the first power. Products and sums are evaluated left to right within their precedence level, respecting the displayed parentheses; every elementary operation rounds to the selected format. The feasibility increment records the resulting floating-point outputs. No such output is asserted here.\n",
         "register": "cex:exemplars:rump-polynomial",
         "slug": "rump-polynomial",
         "title": "Rump's polynomial"
       },
       "stress": {
         "bites": [
-          "step:nrz:bite-exemplar-register",
-          "step:nrz:bite-numerical-feasibility",
-          "step:nrz:bite-units-and-foundations",
-          "step:nrz:bite-accuracy-and-benchmarks"
+          "step:nrz:increment-exemplar-register",
+          "step:nrz:increment-numerical-feasibility",
+          "step:nrz:increment-units-and-foundations",
+          "step:nrz:increment-accuracy-and-benchmarks"
         ],
         "claims": [
           "dec:vision:independent-verification-arithmetic",
@@ -2690,7 +2690,7 @@
       "variants": [
         {
           "description": "measure naive binary32 and require honest validated behaviour",
-          "expected": "The mathematical target remains -54767/66192. The feasibility bite measures the naive result under the explicitly stated evaluation convention; no particular floating-point output is prescribed.\nA validated path carries input, representation, arithmetic and verification contributions, including conversion accounting for any finite-precision imports. It either produces an enclosure containing -54767/66192 or refuses the requested guarantee. If an enclosure is too wide for the relative budget 1e-6, it may be retained as diagnostic evidence but must not be reported as budget success. Any claimed budget success requires a validated radius within that budget. A confident enclosure excluding the exact negative value is a defect.\n",
+          "expected": "The mathematical target remains -54767/66192. The feasibility increment measures the naive result under the explicitly stated evaluation convention; no particular floating-point output is prescribed.\nA validated path carries input, representation, arithmetic and verification contributions, including conversion accounting for any finite-precision imports. It either produces an enclosure containing -54767/66192 or refuses the requested guarantee. If an enclosure is too wide for the relative budget 1e-6, it may be retained as diagnostic evidence but must not be reported as budget success. Any claimed budget success requires a validated radius within that budget. A confident enclosure excluding the exact negative value is a defect.\n",
           "name": "binary32-naive-and-validated",
           "overrides": {
             "precision_bits": "24"
@@ -2698,7 +2698,7 @@
         },
         {
           "description": "measure naive binary64 under the same operation-order convention",
-          "expected": "The exact target and validation requirements are unchanged. Increasing the ordinary precision is not itself a proof of correctness. Cancellation can make an unvalidated central value misleading even when the elementary inputs are exactly representable.\nThe accepted behaviours are a validated enclosure containing -54767/66192 with honest budget status, or a numerical refusal. A non-finite intermediate, unsupported arithmetic guarantee or bound exceeding the requested budget is handled as a failure of the requested guarantee. The feasibility bite records the measured naive output and the validated path's evidence separately.\n",
+          "expected": "The exact target and validation requirements are unchanged. Increasing the ordinary precision is not itself a proof of correctness. Cancellation can make an unvalidated central value misleading even when the elementary inputs are exactly representable.\nThe accepted behaviours are a validated enclosure containing -54767/66192 with honest budget status, or a numerical refusal. A non-finite intermediate, unsupported arithmetic guarantee or bound exceeding the requested budget is handled as a failure of the requested guarantee. The feasibility increment records the measured naive output and the validated path's evidence separately.\n",
           "name": "binary64-naive-and-validated",
           "overrides": {
             "precision_bits": "53"
