@@ -5,6 +5,7 @@ mod admit;
 mod fibre;
 mod future;
 mod project;
+mod timing_fibre;
 mod witness;
 
 use super::{AT, LcRelationError, storage};

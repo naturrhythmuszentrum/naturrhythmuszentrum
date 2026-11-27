@@ -446,7 +446,7 @@ fn lc_affine_clock_phase_refusals() -> TestResult {
     assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::PendingPremise));
     assert_eq!(fault.location, SIGN_AT);
     let mut bad = original.clone();
-    bad.observations[0].lift_domain = [1, 1];
+    bad.observations[0].lift = 5;
     let fault = cas
         .construct_lc_affine_clock_phase(&bad, &mut wide()?)
         .expect_err("selected turn is outside its lift domain");

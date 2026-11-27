@@ -7,6 +7,7 @@ mod clock_phase;
 mod service;
 #[cfg(test)]
 mod tests;
+mod timing_clock_phase;
 mod wire;
 
 pub use clock_phase::{
@@ -15,9 +16,17 @@ pub use clock_phase::{
     ClockPhaseVertex, ClockPhaseWitness,
 };
 pub use service::{Certificate, Receipt};
+pub use timing_clock_phase::{
+    TimingClockPhaseCertificate, TimingClockPhaseEdge, TimingClockPhaseObservation,
+    TimingClockPhaseReceipt, TimingClockPhaseRequest, TimingClockPhaseSourceKind,
+    TimingClockPhaseSourceSlot, TimingClockPhaseTopology, TimingClockPhaseVertex,
+    TimingClockPhaseWitness,
+};
 
 /// Registered common-clock and common-phase fibre theorem.
 pub const CLOCK_PHASE_SCHEMA: crate::proof::LemmaSchema = clock_phase::SCHEMA;
+/// Registered timing, common-clock and common-phase fibre theorem.
+pub const TIMING_CLOCK_PHASE_SCHEMA: crate::proof::LemmaSchema = timing_clock_phase::SCHEMA;
 
 use crate::pi_bounds::PiBoundCertificate;
 use crate::{Location, Rational};

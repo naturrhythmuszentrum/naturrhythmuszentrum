@@ -220,7 +220,7 @@ pub use model::{
 pub use power::{PowerEvidence, PowerRoute};
 
 /// Closed formal register; no unimplemented analytic schema grants authority.
-pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 14] = [
+pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 15] = [
     crate::emptiness::LemmaSchema {
         name: "enclosure.rational-inclusion",
         label: "thm:cas:enclosure-rational-inclusion",
@@ -296,6 +296,7 @@ pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 14] = [
     prepared_expm1::SCHEMA,
     lc_affine_fibre::SCHEMA,
     lc_affine_fibre::CLOCK_PHASE_SCHEMA,
+    lc_affine_fibre::TIMING_CLOCK_PHASE_SCHEMA,
     lc_root::SCHEMA,
     lc_source_substitution::SCHEMA,
 ];
