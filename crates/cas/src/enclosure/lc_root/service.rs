@@ -133,16 +133,58 @@ impl Cas {
         request: &Request,
         budget: &mut Budget,
     ) -> Result<Receipt, Fault> {
+        self.construct_lc_root_indexed_inner(session, None, request, budget)
+    }
+
+    /// Probe an optional bounded warm index before the session index.
+    /// # Errors
+    /// Refuses foreign references, exhausted history, invalid originals or resources.
+    pub fn construct_lc_root_indexed_with_warm(
+        &mut self,
+        session: &mut crate::exact_cache::ExactCacheSession,
+        warm: &mut crate::exact_cache::ExactWarmIndex,
+        request: &Request,
+        budget: &mut Budget,
+    ) -> Result<Receipt, Fault> {
+        self.construct_lc_root_indexed_inner(session, Some(warm), request, budget)
+    }
+
+    /// Shared opt-in route; a missing warm index preserves the session-only tariff.
+    #[allow(clippy::too_many_lines)]
+    fn construct_lc_root_indexed_inner(
+        &mut self,
+        session: &mut crate::exact_cache::ExactCacheSession,
+        mut warm: Option<&mut crate::exact_cache::ExactWarmIndex>,
+        request: &Request,
+        budget: &mut Budget,
+    ) -> Result<Receipt, Fault> {
         if self.state.is_journaled() {
             return Err(Fault::invalid(InvalidCode::Reference, AT));
         }
         session.prepare(self)?;
+        if let Some(index) = warm.as_deref_mut() {
+            index.prepare(self)?;
+        }
         {
             let statement =
                 budget.with_work_phase("lc-root-index", "key-construction", |budget| {
                     super::wire::scope(self, request, budget)
                 })?;
-            if let Some(judgment) = budget.with_work_phase("lc-root-index", "probe", |budget| {
+            let mut warm_hit = false;
+            let found = budget.with_work_phase("lc-root-index", "probe", |budget| {
+                if let Some(index) = warm.as_deref_mut()
+                    && let Some(hit) = index.lookup(
+                        self,
+                        crate::exact_cache::Kind::Root,
+                        &statement,
+                        None,
+                        None,
+                        budget,
+                    )?
+                {
+                    warm_hit = true;
+                    return Ok(Some(hit));
+                }
                 session.lookup(
                     self,
                     crate::exact_cache::Kind::Root,
@@ -151,13 +193,30 @@ impl Cas {
                     None,
                     budget,
                 )
-            })? {
+            })?;
+            if let Some(judgment) = found {
                 let matches =
                     budget.with_work_phase("lc-root-index", "authentication", |budget| {
                         Ok::<_, Fault>(self.lc_root_request(&judgment, budget)? == request)
                     })?;
                 if matches {
-                    return budget.with_work_phase("lc-root-index", "copy", |budget| {
+                    let warm_proposal = if warm_hit {
+                        None
+                    } else {
+                        warm.as_deref_mut()
+                            .map(|index| index.reserve(&statement, budget))
+                            .transpose()?
+                    };
+                    let proof = if warm_proposal.is_some() {
+                        Some(
+                            session
+                                .proof_for(&judgment)
+                                .ok_or_else(|| Fault::invalid(InvalidCode::Reference, AT))?,
+                        )
+                    } else {
+                        None
+                    };
+                    let receipt = budget.with_work_phase("lc-root-index", "copy", |budget| {
                         budget.check(
                             BudgetKind::OutputBytes,
                             self.retained_judgment_bytes()
@@ -168,12 +227,35 @@ impl Cas {
                             judgment,
                             owner: Arc::clone(&self.memo_owner),
                         })
-                    });
+                    })?;
+                    if let (Some(index), Some(proposal), Some(proof)) = (warm, warm_proposal, proof)
+                    {
+                        index.admit(
+                            crate::exact_cache::Kind::Root,
+                            proposal,
+                            proof,
+                            None,
+                            receipt.judgment.clone(),
+                        );
+                    }
+                    return Ok(receipt);
                 }
             }
             let proposal = session.reserve(&statement, budget)?;
-            let (receipt, proof) =
-                budget.with_retained_payload(proposal.retained_bytes(), AT, |budget| {
+            let warm_proposal = warm
+                .as_deref_mut()
+                .map(|index| index.reserve(&statement, budget))
+                .transpose()?;
+            let warm_retained = warm_proposal
+                .as_ref()
+                .map_or(0, crate::exact_cache::WarmProposal::retained_bytes);
+            let warm_staged = warm_proposal
+                .as_ref()
+                .map_or(0, crate::exact_cache::WarmProposal::staged_bytes);
+            let (receipt, proof) = budget.with_retained_payload(
+                proposal.retained_bytes().saturating_add(warm_staged),
+                AT,
+                |budget| {
                     run(
                         self,
                         request,
@@ -181,17 +263,28 @@ impl Cas {
                         true,
                         proposal
                             .retained_bytes()
+                            .saturating_add(warm_retained)
                             .saturating_add(size_of::<Receipt>() as u64),
                         budget,
                     )
-                })?;
+                },
+            )?;
             session.admit(
                 crate::exact_cache::Kind::Root,
                 proposal,
-                proof,
+                Arc::clone(&proof),
                 None,
                 receipt.judgment.clone(),
             );
+            if let (Some(index), Some(proposal)) = (warm, warm_proposal) {
+                index.admit(
+                    crate::exact_cache::Kind::Root,
+                    proposal,
+                    proof,
+                    None,
+                    receipt.judgment.clone(),
+                );
+            }
             Ok(receipt)
         }
     }

@@ -98,25 +98,75 @@ impl Cas {
         root: &lc_root::Receipt,
         budget: &mut Budget,
     ) -> Result<Receipt, Fault> {
+        self.construct_lc_source_substitution_indexed_inner(session, None, request, root, budget)
+    }
+
+    /// Probe a bounded warm index before session references and publish on a miss.
+    /// # Errors
+    /// Refuses foreign or stale authority, exhausted history and caller resources.
+    pub fn construct_lc_source_substitution_indexed_with_warm(
+        &mut self,
+        session: &mut crate::exact_cache::ExactCacheSession,
+        warm: &mut crate::exact_cache::ExactWarmIndex,
+        request: &Request,
+        root: &lc_root::Receipt,
+        budget: &mut Budget,
+    ) -> Result<Receipt, Fault> {
+        self.construct_lc_source_substitution_indexed_inner(
+            session,
+            Some(warm),
+            request,
+            root,
+            budget,
+        )
+    }
+
+    /// Shared opt-in route; statement and proof keys are built before either index is probed.
+    #[allow(clippy::too_many_lines)]
+    fn construct_lc_source_substitution_indexed_inner(
+        &mut self,
+        session: &mut crate::exact_cache::ExactCacheSession,
+        mut warm: Option<&mut crate::exact_cache::ExactWarmIndex>,
+        request: &Request,
+        root: &lc_root::Receipt,
+        budget: &mut Budget,
+    ) -> Result<Receipt, Fault> {
         if self.state.is_journaled() {
             return Err(Fault::invalid(InvalidCode::Reference, AT));
         }
         session.prepare(self)?;
+        if let Some(index) = warm.as_deref_mut() {
+            index.prepare(self)?;
+        }
         {
-            let scope =
-                budget.with_work_phase("lc-substitution-index", "key-construction", |budget| {
-                    wire::scope(self, request, budget)
-                })?;
+            let scope = budget.with_work_phase("lc-substitution-index", "scope-key", |budget| {
+                wire::scope(self, request, budget)
+            })?;
             let root_wire =
-                budget.with_work_phase("lc-substitution-index", "key-construction", |budget| {
+                budget.with_work_phase("lc-substitution-index", "root-proof-key", |budget| {
                     root.certificate(self, budget)?.to_bytes(budget)
                 })?;
-            let wire =
-                budget.with_work_phase("lc-substitution-index", "key-construction", |budget| {
-                    wire::encode(&scope, &root_wire, budget)
-                })?;
+            let wire = budget.with_work_phase(
+                "lc-substitution-index",
+                "proof-encoding-key",
+                |budget| wire::encode(&scope, &root_wire, budget),
+            )?;
+            let mut warm_hit = false;
             if let Some(judgment) =
                 budget.with_work_phase("lc-substitution-index", "probe", |budget| {
+                    if let Some(index) = warm.as_deref_mut()
+                        && let Some(hit) = index.lookup(
+                            self,
+                            crate::exact_cache::Kind::Substitution,
+                            &scope,
+                            Some(&wire),
+                            Some(&root.judgment),
+                            budget,
+                        )?
+                    {
+                        warm_hit = true;
+                        return Ok(Some(hit));
+                    }
                     session.lookup(
                         self,
                         crate::exact_cache::Kind::Substitution,
@@ -133,26 +183,66 @@ impl Cas {
                     |budget| self.lc_source_substitution_receipt(&judgment, budget),
                 )?;
                 if &retained.request == request && retained.root.judgment == root.judgment {
-                    return budget.with_work_phase("lc-substitution-index", "copy", |budget| {
-                        budget.check(
-                            BudgetKind::OutputBytes,
-                            self.retained_judgment_bytes()
-                                .saturating_add(retained.retained_bytes()),
-                            AT,
-                        )?;
-                        retain(
-                            self,
-                            &retained.request,
-                            &retained.root,
-                            &retained.wire,
-                            budget,
+                    let warm_proposal = if warm_hit {
+                        None
+                    } else {
+                        warm.as_deref_mut()
+                            .map(|index| index.reserve(&scope, budget))
+                            .transpose()?
+                    };
+                    let proof = if warm_proposal.is_some() {
+                        Some(
+                            session
+                                .proof_for(&judgment)
+                                .ok_or_else(|| Fault::invalid(InvalidCode::Reference, AT))?,
                         )
-                    });
+                    } else {
+                        None
+                    };
+                    let receipt =
+                        budget.with_work_phase("lc-substitution-index", "copy", |budget| {
+                            budget.check(
+                                BudgetKind::OutputBytes,
+                                self.retained_judgment_bytes()
+                                    .saturating_add(retained.retained_bytes()),
+                                AT,
+                            )?;
+                            retain(
+                                self,
+                                &retained.request,
+                                &retained.root,
+                                &retained.wire,
+                                budget,
+                            )
+                        })?;
+                    if let (Some(index), Some(proposal), Some(proof)) = (warm, warm_proposal, proof)
+                    {
+                        index.admit(
+                            crate::exact_cache::Kind::Substitution,
+                            proposal,
+                            proof,
+                            Some(root.judgment.clone()),
+                            judgment,
+                        );
+                    }
+                    return Ok(receipt);
                 }
             }
             let proposal = session.reserve(&scope, budget)?;
-            let (receipt, judgment, proof) =
-                budget.with_retained_payload(proposal.retained_bytes(), AT, |budget| {
+            let warm_proposal = warm
+                .as_deref_mut()
+                .map(|index| index.reserve(&scope, budget))
+                .transpose()?;
+            let warm_retained = warm_proposal
+                .as_ref()
+                .map_or(0, crate::exact_cache::WarmProposal::retained_bytes);
+            let warm_staged = warm_proposal
+                .as_ref()
+                .map_or(0, crate::exact_cache::WarmProposal::staged_bytes);
+            let (receipt, judgment, proof) = budget.with_retained_payload(
+                proposal.retained_bytes().saturating_add(warm_staged),
+                AT,
+                |budget| {
                     check::verify(self, request, root, budget)?;
                     let receipt = retain(self, request, root, &wire, budget)?;
                     let (judgment, proof) =
@@ -162,20 +252,31 @@ impl Cas {
                                     receipt.clone(),
                                     proposal
                                         .retained_bytes()
+                                        .saturating_add(warm_retained)
                                         .saturating_add(receipt.retained_bytes()),
                                     budget,
                                 )
                             })
                         })?;
                     Ok((receipt, judgment, proof))
-                })?;
+                },
+            )?;
             session.admit(
                 crate::exact_cache::Kind::Substitution,
                 proposal,
-                proof,
+                Arc::clone(&proof),
                 Some(root.judgment.clone()),
-                judgment,
+                judgment.clone(),
             );
+            if let (Some(index), Some(proposal)) = (warm, warm_proposal) {
+                index.admit(
+                    crate::exact_cache::Kind::Substitution,
+                    proposal,
+                    proof,
+                    Some(root.judgment.clone()),
+                    judgment,
+                );
+            }
             Ok(receipt)
         }
     }

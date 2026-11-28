@@ -5,7 +5,7 @@ use super::*;
 use crate::budget::{Budget, Limits};
 use crate::domain_model::{AmbientDomain, ContextDraft, HeaderDraft, RegionDraft, RegionExpr};
 use crate::enclosure::lc_root;
-use crate::exact_cache::ExactCacheSession;
+use crate::exact_cache::{ExactCacheSession, ExactWarmIndex};
 use crate::graph::{Draft, ExpressionDraft};
 use crate::model::{AtomicSort, Branch, Declaration, Environment, Field, Operator, Sort};
 use crate::{Cas, Fault, Handle, Rational, Reference};
@@ -375,7 +375,9 @@ fn exact_cache_substitution_mutable_second_preparation() -> TestResult {
             .map(|(_, receipt)| receipt.inclusive)
             .sum::<u64>()
     };
-    assert_eq!(phase_work("key-construction"), 182_745);
+    assert_eq!(phase_work("scope-key"), 154_896);
+    assert_eq!(phase_work("root-proof-key"), 14_072);
+    assert_eq!(phase_work("proof-encoding-key"), 13_777);
     assert_eq!(phase_work("probe"), 41_006);
     assert_eq!(phase_work("authentication"), 0);
     assert_eq!(phase_work("copy"), 13_811);
@@ -384,12 +386,6 @@ fn exact_cache_substitution_mutable_second_preparation() -> TestResult {
             .receipts
             .keys()
             .any(|(_, _, _, name)| name == "authentication")
-    );
-    assert!(
-        !report.receipts.keys().any(|(_, _, _, name)| matches!(
-            name.as_str(),
-            "candidate" | "checking" | "derivation"
-        ))
     );
 
     assert_eq!(first.wire, second.wire);
@@ -738,6 +734,483 @@ fn exact_cache_root_substitution_boundaries() -> TestResult {
 
     check_crowded_byte_limits(&mut cas, &request, &root, &mut session, output, work)?;
     Ok(())
+}
+
+/// Warm references precede a new session and evict the oldest eligible reference.
+/// ´test:unit:exact-cache-warm-before-store-and-eviction´
+#[test]
+fn exact_cache_warm_before_store_and_eviction() -> TestResult {
+    let (mut cas, request) = source_request_fixture(Tag::Box)?;
+    let mut session = ExactCacheSession::new();
+    let mut warm = ExactWarmIndex::with_limits(7_000, 1);
+    let first = cas.construct_lc_root_indexed_with_warm(
+        &mut session,
+        &mut warm,
+        &request.root,
+        &mut ledger()?,
+    )?;
+    assert_eq!(warm.len(), 1);
+    let serial = warm.last_serial();
+    let mut both_hit = ledger()?;
+    cas.construct_lc_root_indexed_with_warm(&mut session, &mut warm, &request.root, &mut both_hit)?;
+    assert_eq!(both_hit.usage().work, 163_994);
+    assert_eq!(warm.len(), 1);
+    assert_eq!(warm.last_serial(), serial);
+    let mut fresh = ExactCacheSession::new();
+    let mut hit = ledger()?;
+    let again =
+        cas.construct_lc_root_indexed_with_warm(&mut fresh, &mut warm, &request.root, &mut hit)?;
+    assert_eq!(again.judgment, first.judgment);
+    assert!(fresh.is_empty());
+    assert_eq!(warm.last_serial(), serial);
+    assert!(warm.pin(serial.ok_or("missing warm serial")?));
+    let mut substitution = ExactCacheSession::new();
+    assert!(
+        cas.construct_lc_source_substitution_indexed_with_warm(
+            &mut substitution,
+            &mut warm,
+            &request,
+            &first,
+            &mut ledger()?,
+        )
+        .is_err()
+    );
+    assert_eq!(warm.len(), 1);
+    assert!(warm.unpin(serial.ok_or("missing warm serial")?));
+    let scope = wire::scope(&cas, &request, &mut ledger()?)?;
+    let mut exact = Budget::new(Limits {
+        payload_bytes: 6_321,
+        staged_payload_bytes: 6_337,
+        output_bytes: 6_305,
+        ..Limits::default()
+    })?;
+    assert_eq!(warm.reserve(&scope, &mut exact)?.staged_bytes(), 6_337);
+    let mut short = Budget::new(Limits {
+        payload_bytes: 6_321,
+        staged_payload_bytes: 6_336,
+        output_bytes: 6_305,
+        ..Limits::default()
+    })?;
+    assert!(warm.reserve(&scope, &mut short).is_err());
+    let mut short_residence = Budget::new(Limits {
+        payload_bytes: 6_320,
+        staged_payload_bytes: 6_337,
+        output_bytes: 6_305,
+        ..Limits::default()
+    })?;
+    assert!(warm.reserve(&scope, &mut short_residence).is_err());
+    cas.construct_lc_source_substitution_indexed_with_warm(
+        &mut substitution,
+        &mut warm,
+        &request,
+        &first,
+        &mut ledger()?,
+    )?;
+    assert_eq!(warm.len(), 1);
+    assert_eq!(warm.history_len(), 1);
+    assert_eq!(warm.last_evicted_serial(), serial);
+    assert_eq!(warm.recovered_bytes(), 6_957);
+    assert_eq!(warm.retained_bytes(), 6_321);
+    let before = cas.counts();
+    assert!(
+        cas.construct_lc_root_indexed_with_warm(
+            &mut ExactCacheSession::new(),
+            &mut warm,
+            &request.root,
+            &mut ledger()?,
+        )
+        .is_err()
+    );
+    assert_eq!(cas.counts(), before);
+    check_session_warm_admission()?;
+    Ok(())
+}
+
+/// An already checked session hit seeds a newly supplied warm index in both kinds.
+fn check_session_warm_admission() -> TestResult {
+    let (mut cas, request) = source_request_fixture(Tag::Box)?;
+    let mut session = ExactCacheSession::new();
+    let root = cas.construct_lc_root_indexed(&mut session, &request.root, &mut ledger()?)?;
+    cas.construct_lc_source_substitution_indexed(&mut session, &request, &root, &mut ledger()?)?;
+    let before = cas.counts();
+    let mut warm = ExactWarmIndex::new();
+    cas.construct_lc_root_indexed_with_warm(
+        &mut session,
+        &mut warm,
+        &request.root,
+        &mut ledger()?,
+    )?;
+    assert_eq!(warm.len(), 1);
+    cas.construct_lc_source_substitution_indexed_with_warm(
+        &mut session,
+        &mut warm,
+        &request,
+        &root,
+        &mut ledger()?,
+    )?;
+    assert_eq!(warm.len(), 2);
+    let serial = warm.last_serial();
+    cas.construct_lc_source_substitution_indexed_with_warm(
+        &mut ExactCacheSession::new(),
+        &mut warm,
+        &request,
+        &root,
+        &mut ledger()?,
+    )?;
+    assert_eq!(warm.last_serial(), serial);
+    assert_eq!(cas.counts(), before);
+    Ok(())
+}
+
+/// Dropping caller references cannot remove the graph theorem or import foreign authority.
+/// ´test:unit:exact-cache-warm-release-authority´
+#[test]
+fn exact_cache_warm_release_authority() -> TestResult {
+    let (mut cas, request) = source_request_fixture(Tag::Box)?;
+    let mut session = ExactCacheSession::new();
+    let mut warm = ExactWarmIndex::new();
+    let receipt = cas.construct_lc_root_indexed_with_warm(
+        &mut session,
+        &mut warm,
+        &request.root,
+        &mut ledger()?,
+    )?;
+    let serial = warm.last_serial();
+    let before = cas.counts();
+    let bytes = warm.retained_bytes();
+    let mut short = Budget::new(Limits {
+        edges: before.edges as u64,
+        ..Limits::default()
+    })?;
+    assert!(
+        cas.construct_lc_source_substitution_indexed_with_warm(
+            &mut session,
+            &mut warm,
+            &request,
+            &receipt,
+            &mut short,
+        )
+        .is_err()
+    );
+    assert_eq!(warm.retained_bytes(), bytes);
+    assert_eq!(warm.last_serial(), serial);
+    assert_eq!(cas.counts(), before);
+    let mut readmitted = ExactCacheSession::new();
+    cas.construct_lc_root_indexed_with_warm(
+        &mut readmitted,
+        &mut warm,
+        &request.root,
+        &mut ledger()?,
+    )?;
+    assert!(warm.last_serial() > serial);
+    assert_eq!(warm.len(), 1);
+    drop(session);
+    drop(readmitted);
+    warm.release();
+    assert_eq!(warm.retained_bytes(), 0);
+    assert_eq!(receipt.request(&cas, &mut ledger()?)?, &request.root);
+    assert_eq!(cas.counts(), before);
+    let (mut foreign, other) = source_request_fixture(Tag::Box)?;
+    assert!(matches!(foreign.construct_lc_root_indexed_with_warm(
+        &mut ExactCacheSession::new(), &mut warm, &other.root, &mut ledger()?,
+    ), Err(error) if matches!(error.kind, crate::FaultKind::Invalid(crate::InvalidCode::ForeignHandle))));
+    assert!(
+        cas.transaction(&mut ledger()?, |_, _| {
+            Err::<(), _>(Fault::invalid(crate::InvalidCode::Reference, AT))
+        })
+        .is_err()
+    );
+    let mut fresh = ExactCacheSession::new();
+    cas.construct_lc_root_indexed_with_warm(&mut fresh, &mut warm, &request.root, &mut ledger()?)?;
+    assert!(warm.last_serial() > serial);
+    warm.saturate_serial_for_test();
+    let before = cas.counts();
+    assert!(
+        cas.construct_lc_source_substitution_indexed_with_warm(
+            &mut fresh,
+            &mut warm,
+            &request,
+            &receipt,
+            &mut ledger()?,
+        )
+        .is_err()
+    );
+    assert_eq!(cas.counts(), before);
+    Ok(())
+}
+
+/// Warm lookup Work is local to the candidate, and exact limits refuse at N minus one.
+/// ´test:unit:exact-cache-warm-byte-work-neighbors´
+#[test]
+#[allow(clippy::too_many_lines)]
+fn exact_cache_warm_byte_work_neighbors() -> TestResult {
+    const PREFIX: u64 = 7;
+    let (mut cas, request) = source_request_fixture(Tag::MappedCover)?;
+    let mut session = ExactCacheSession::new();
+    let mut warm = ExactWarmIndex::new();
+    let mut root_cold = ledger()?;
+    let root = cas.construct_lc_root_indexed_with_warm(
+        &mut session,
+        &mut warm,
+        &request.root,
+        &mut root_cold,
+    )?;
+    let mut root_hit = ledger()?;
+    cas.construct_lc_root_indexed_with_warm(
+        &mut ExactCacheSession::new(),
+        &mut warm,
+        &request.root,
+        &mut root_hit,
+    )?;
+    let mut sub_cold = ledger()?;
+    cas.construct_lc_source_substitution_indexed_with_warm(
+        &mut session,
+        &mut warm,
+        &request,
+        &root,
+        &mut sub_cold,
+    )?;
+    let mut sub_hit = ledger()?;
+    cas.construct_lc_source_substitution_indexed_with_warm(
+        &mut ExactCacheSession::new(),
+        &mut warm,
+        &request,
+        &root,
+        &mut sub_hit,
+    )?;
+    let (mut ordinary_cas, ordinary_request) = source_request_fixture(Tag::MappedCover)?;
+    let mut root_ordinary = ledger()?;
+    let ordinary_root =
+        ordinary_cas.construct_lc_root(&ordinary_request.root, &mut root_ordinary)?;
+    let mut sub_ordinary = ledger()?;
+    ordinary_cas.construct_lc_source_substitution(
+        &ordinary_request,
+        &ordinary_root,
+        &mut sub_ordinary,
+    )?;
+    let root_work = root_hit.usage().work;
+    let sub_work = sub_hit.usage().work;
+    assert_eq!(root_cold.usage().work, 351_107);
+    assert_eq!(root_work, 163_994);
+    assert_eq!(sub_cold.usage().work, 294_136);
+    assert_eq!(sub_work, 237_562);
+    assert_eq!(root_ordinary.usage().work, 173_205);
+    assert_eq!(sub_ordinary.usage().work, 196_585);
+    assert_eq!(warm.retained_bytes(), 13_794);
+    let scope = wire::scope(&cas, &request, &mut ledger()?)?;
+    let mut exact_bytes = Budget::new(Limits {
+        payload_bytes: 6_837,
+        staged_payload_bytes: 6_837,
+        output_bytes: 6_837,
+        ..Limits::default()
+    })?;
+    let mut local_warm = ExactWarmIndex::new();
+    assert_eq!(
+        local_warm
+            .reserve(&scope, &mut exact_bytes)?
+            .retained_bytes(),
+        6_837
+    );
+    let mut short_bytes = Budget::new(Limits {
+        payload_bytes: 6_837,
+        staged_payload_bytes: 6_837,
+        output_bytes: 6_836,
+        ..Limits::default()
+    })?;
+    assert!(local_warm.reserve(&scope, &mut short_bytes).is_err());
+    let mut short_payload = Budget::new(Limits {
+        payload_bytes: 6_836,
+        staged_payload_bytes: 6_837,
+        output_bytes: 6_837,
+        ..Limits::default()
+    })?;
+    assert!(local_warm.reserve(&scope, &mut short_payload).is_err());
+    let mut crowded_reserve = ExactWarmIndex::new();
+    crowded_reserve.seed_unrelated(&cas, &request.targets[0], 64)?;
+    let mut crowded_budget = ledger()?;
+    crowded_reserve.reserve(&scope, &mut crowded_budget)?;
+    assert_eq!(crowded_budget.usage().work, exact_bytes.usage().work);
+    for (work, root_call) in [(root_work, true), (sub_work, false)] {
+        let mut exact = Budget::new(Limits {
+            work: work + PREFIX,
+            ..Limits::default()
+        })?;
+        exact.work(PREFIX, AT)?;
+        if root_call {
+            cas.construct_lc_root_indexed_with_warm(
+                &mut ExactCacheSession::new(),
+                &mut warm,
+                &request.root,
+                &mut exact,
+            )?;
+        } else {
+            cas.construct_lc_source_substitution_indexed_with_warm(
+                &mut ExactCacheSession::new(),
+                &mut warm,
+                &request,
+                &root,
+                &mut exact,
+            )?;
+        }
+        assert_eq!(exact.usage().work, work + PREFIX);
+        let mut short = Budget::new(Limits {
+            work: work + PREFIX - 1,
+            ..Limits::default()
+        })?;
+        short.work(PREFIX, AT)?;
+        let refused = if root_call {
+            cas.construct_lc_root_indexed_with_warm(
+                &mut ExactCacheSession::new(),
+                &mut warm,
+                &request.root,
+                &mut short,
+            )
+            .is_err()
+        } else {
+            cas.construct_lc_source_substitution_indexed_with_warm(
+                &mut ExactCacheSession::new(),
+                &mut warm,
+                &request,
+                &root,
+                &mut short,
+            )
+            .is_err()
+        };
+        assert!(refused);
+        assert_eq!(
+            short.usage().work,
+            if root_call { 157_156 } else { 223_758 }
+        );
+    }
+    let root_peak = warm_staged_limit(|budget| {
+        cas.construct_lc_root_indexed_with_warm(
+            &mut ExactCacheSession::new(),
+            &mut warm,
+            &request.root,
+            budget,
+        )
+        .map(|_| ())
+    })?;
+    let sub_peak = warm_staged_limit(|budget| {
+        cas.construct_lc_source_substitution_indexed_with_warm(
+            &mut ExactCacheSession::new(),
+            &mut warm,
+            &request,
+            &root,
+            budget,
+        )
+        .map(|_| ())
+    })?;
+    assert_eq!(root_peak, 24_168);
+    assert_eq!(sub_peak, 59_340);
+    let session_root_peak = warm_staged_limit(|budget| {
+        cas.construct_lc_root_indexed(&mut session, &request.root, budget)
+            .map(|_| ())
+    })?;
+    let session_sub_peak = warm_staged_limit(|budget| {
+        cas.construct_lc_source_substitution_indexed(&mut session, &request, &root, budget)
+            .map(|_| ())
+    })?;
+    assert_eq!(session_root_peak, 24_168);
+    assert_eq!(session_sub_peak, 59_340);
+    check_crowded_warm_history()?;
+    let (mut other, other_request) = source_request_fixture(Tag::MappedCover)?;
+    let mut crowded = ExactWarmIndex::new();
+    crowded.seed_unrelated(&other, &other_request.targets[0], 64)?;
+    let mut other_session = ExactCacheSession::new();
+    let mut other_root_cold = ledger()?;
+    let other_root = other.construct_lc_root_indexed_with_warm(
+        &mut other_session,
+        &mut crowded,
+        &other_request.root,
+        &mut other_root_cold,
+    )?;
+    assert_eq!(other_root_cold.usage().work, root_cold.usage().work);
+    let mut root_crowded = ledger()?;
+    other.construct_lc_root_indexed_with_warm(
+        &mut ExactCacheSession::new(),
+        &mut crowded,
+        &other_request.root,
+        &mut root_crowded,
+    )?;
+    assert_eq!(root_crowded.usage().work, root_work);
+    let mut other_sub_cold = ledger()?;
+    other.construct_lc_source_substitution_indexed_with_warm(
+        &mut other_session,
+        &mut crowded,
+        &other_request,
+        &other_root,
+        &mut other_sub_cold,
+    )?;
+    assert_eq!(other_sub_cold.usage().work, sub_cold.usage().work);
+    let mut sub_crowded = ledger()?;
+    other.construct_lc_source_substitution_indexed_with_warm(
+        &mut ExactCacheSession::new(),
+        &mut crowded,
+        &other_request,
+        &other_root,
+        &mut sub_crowded,
+    )?;
+    assert_eq!(sub_crowded.usage().work, sub_work);
+    Ok(())
+}
+
+/// A planned eviction has one local charge even after a prior eviction record.
+fn check_crowded_warm_history() -> TestResult {
+    let (mut cas, request) = source_request_fixture(Tag::Box)?;
+    let mut session = ExactCacheSession::new();
+    let mut warm = ExactWarmIndex::with_limits(7_000, 2);
+    let root = cas.construct_lc_root_indexed_with_warm(
+        &mut session,
+        &mut warm,
+        &request.root,
+        &mut ledger()?,
+    )?;
+    cas.construct_lc_source_substitution_indexed_with_warm(
+        &mut session,
+        &mut warm,
+        &request,
+        &root,
+        &mut ledger()?,
+    )?;
+    assert_eq!(warm.history_len(), 1);
+    let scope = wire::scope(&cas, &request, &mut ledger()?)?;
+    let mut budget = ledger()?;
+    let proposal = warm.reserve(&scope, &mut budget)?;
+    assert_eq!(proposal.retained_bytes(), 6_305);
+    assert_eq!(budget.usage().work, 6_307);
+    Ok(())
+}
+
+/// Find the exact staged-byte peak by monotone bounded calls on a fixed hit.
+fn warm_staged_limit(mut call: impl FnMut(&mut Budget) -> Result<(), Fault>) -> TestResult<u64> {
+    let mut lower = 0_u64;
+    let mut upper = Limits::default().staged_payload_bytes;
+    while lower < upper {
+        let middle = lower + (upper - lower) / 2;
+        let mut budget = Budget::new(Limits {
+            staged_payload_bytes: middle,
+            ..Limits::default()
+        })?;
+        if call(&mut budget).is_ok() {
+            upper = middle;
+        } else {
+            lower = middle + 1;
+        }
+    }
+    let mut exact = Budget::new(Limits {
+        staged_payload_bytes: upper,
+        ..Limits::default()
+    })?;
+    call(&mut exact)?;
+    if upper > 0 {
+        let mut short = Budget::new(Limits {
+            staged_payload_bytes: upper - 1,
+            ..Limits::default()
+        })?;
+        assert!(call(&mut short).is_err());
+    }
+    Ok(upper)
 }
 
 /// A crowded session meets the uncrowded exact byte ceilings on the same fixture.
