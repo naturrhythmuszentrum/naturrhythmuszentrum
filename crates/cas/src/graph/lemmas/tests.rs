@@ -13,6 +13,15 @@ use crate::testing::common::TestResult;
 use crate::{Fault, FaultKind, Rational};
 use fixture::{Fixture, ledger};
 
+/// Adding an opt-in boxed kind preserves the existing anonymous node size and pinned tariffs.
+/// ´test:unit:exact-cache-anonymous-lemma-168-bytes´
+#[test]
+fn exact_cache_anonymous_lemma_168_bytes() {
+    assert_eq!(size_of::<super::AnonymousLemma>(), 168);
+    // Public Cas is pinned at 984 bytes; the test-only checkpoint adds 8 bytes.
+    assert_eq!(size_of::<crate::graph::Cas>(), 984 + 8);
+}
+
 /// Every checked graph kind contributes once; portable proof retention has a separate owner.
 /// ´test:unit:retained-judgment-mixed-payload´
 #[test]

@@ -3,6 +3,7 @@
 
 mod enclosure;
 mod lc_root;
+mod lc_source_substitution;
 mod prepared_expm1;
 pub(crate) use enclosure::EnclosureInventory;
 pub(crate) use prepared_expm1::Expm1Inventory;
@@ -41,6 +42,8 @@ pub(crate) enum AnonymousLemma {
     PreparedExpm1(prepared_expm1::Expm1Lemma),
     /// Complete conditional LC positive-root family and original dependency inventory.
     LcRoot(lc_root::LcRootLemma),
+    /// Checked original-source substitution of a particular published root proof.
+    LcSourceSubstitution(Box<lc_source_substitution::LcSourceSubstitutionLemma>),
 }
 
 impl AnonymousLemma {
@@ -53,6 +56,7 @@ impl AnonymousLemma {
             Self::Enclosure(node) => node.inventory.key.len(),
             Self::PreparedExpm1(node) => node.inventory.key.len(),
             Self::LcRoot(node) => node.key.len(),
+            Self::LcSourceSubstitution(node) => node.key.len(),
             Self::Scalar(node) => node.inventory.key.len(),
             Self::Pi(node) => node
                 .inventory
@@ -73,6 +77,7 @@ impl AnonymousLemma {
             Self::Enclosure(node) => Ok(node.inventory.bytes),
             Self::PreparedExpm1(node) => Ok(node.inventory.bytes),
             Self::LcRoot(node) => Ok(node.bytes),
+            Self::LcSourceSubstitution(node) => Ok(node.bytes),
         }
     }
 
@@ -84,6 +89,7 @@ impl AnonymousLemma {
             Self::Enclosure(node) => out.raw(&node.inventory.key[1..]),
             Self::PreparedExpm1(node) => out.raw(&node.inventory.key[1..]),
             Self::LcRoot(node) => out.raw(&node.key[1..]),
+            Self::LcSourceSubstitution(node) => out.raw(&node.key[1..]),
             Self::Scalar(node) => {
                 out.byte(1)?;
                 out.unsigned(u64::from(crate::proof::RETAINED_SCHEMAS[1].version))?;

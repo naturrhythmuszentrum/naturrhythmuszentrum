@@ -56,6 +56,8 @@ pub mod enclosure;
 )]
 mod encoding;
 mod error;
+/// Optional caller-held references to complete graph-owned LC judgments.
+pub mod exact_cache;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "closed constant proof helpers stay inside private CAS modules"

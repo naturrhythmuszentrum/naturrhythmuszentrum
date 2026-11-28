@@ -5,6 +5,7 @@ use super::*;
 use crate::budget::{Budget, Limits};
 use crate::domain_model::{AmbientDomain, ContextDraft, HeaderDraft, RegionDraft, RegionExpr};
 use crate::enclosure::lc_root;
+use crate::exact_cache::ExactCacheSession;
 use crate::graph::{Draft, ExpressionDraft};
 use crate::model::{AtomicSort, Branch, Declaration, Environment, Field, Operator, Sort};
 use crate::{Cas, Fault, Handle, Rational, Reference};
@@ -324,6 +325,488 @@ fn lc_source_substitution_registered_replay() -> TestResult {
         assert_eq!(checked.request(&receiver, &mut ledger()?)?, &expected);
         assert_eq!(receiver.retained_judgment_count(), 1);
     }
+    Ok(())
+}
+
+/// A second root request authenticates the retained graph judgment without publication.
+/// ´test:unit:exact-cache-root-mutable-second-preparation´
+#[test]
+fn exact_cache_root_mutable_second_preparation() -> TestResult {
+    let (mut cas, request) = source_request_fixture(Tag::Box)?;
+    let mut session = ExactCacheSession::new();
+    let mut cold = ledger()?;
+    let first = cas.construct_lc_root_indexed(&mut session, &request.root, &mut cold)?;
+    let first_serial = session.last_serial();
+    let before = cas.counts();
+    let mut warm = ledger()?;
+    let second = cas.construct_lc_root_indexed(&mut session, &request.root, &mut warm)?;
+    assert_eq!(first.judgment, second.judgment);
+    assert_eq!(cas.counts(), before);
+    assert_eq!(session.len(), 1);
+    assert_eq!(session.last_serial(), first_serial);
+    assert!(warm.usage().work < cold.usage().work);
+    assert_eq!(warm.usage().work, 163_994);
+    assert_eq!(session.retained_bytes(), 6_949);
+    Ok(())
+}
+
+/// A second source substitution keeps the same particular root dependency and graph node.
+/// ´test:unit:exact-cache-substitution-mutable-second-preparation´
+#[test]
+fn exact_cache_substitution_mutable_second_preparation() -> TestResult {
+    let (mut cas, request) = source_request_fixture(Tag::MappedCover)?;
+    let mut session = ExactCacheSession::new();
+    let root = cas.construct_lc_root_indexed(&mut session, &request.root, &mut ledger()?)?;
+    let mut cold = ledger()?;
+    let first =
+        cas.construct_lc_source_substitution_indexed(&mut session, &request, &root, &mut cold)?;
+    let before = cas.counts();
+    let mut warm = ledger()?;
+    let (second, report) = crate::testing::work_trace::observed(512, || {
+        cas.construct_lc_source_substitution_indexed(&mut session, &request, &root, &mut warm)
+    });
+    let second = second?;
+    assert!(report.complete);
+    let phase_work = |operation: &str| {
+        report
+            .receipts
+            .iter()
+            .filter(|((_, _, _, name), _)| name == operation)
+            .map(|(_, receipt)| receipt.inclusive)
+            .sum::<u64>()
+    };
+    assert_eq!(phase_work("key-construction"), 182_745);
+    assert_eq!(phase_work("probe"), 41_006);
+    assert_eq!(phase_work("authentication"), 0);
+    assert_eq!(phase_work("copy"), 13_811);
+    assert!(
+        report
+            .receipts
+            .keys()
+            .any(|(_, _, _, name)| name == "authentication")
+    );
+    assert!(
+        !report.receipts.keys().any(|(_, _, _, name)| matches!(
+            name.as_str(),
+            "candidate" | "checking" | "derivation"
+        ))
+    );
+
+    assert_eq!(first.wire, second.wire);
+    assert_eq!(cas.counts(), before);
+    assert_eq!(session.len(), 2);
+    assert!(warm.usage().work < cold.usage().work);
+    assert_eq!(warm.usage().work, 237_562);
+    assert_eq!(session.retained_bytes(), 13_778);
+    Ok(())
+}
+
+/// Changed originals, a corrupted proof and a foreign root cannot borrow the indexed witness.
+/// ´test:unit:exact-cache-root-substitution-mutations´
+#[test]
+fn exact_cache_root_substitution_mutations() -> TestResult {
+    let (mut cas, request) = source_request_fixture(Tag::Box)?;
+    let mut session = ExactCacheSession::new();
+    let root = cas.construct_lc_root_indexed(&mut session, &request.root, &mut ledger()?)?;
+    cas.construct_lc_source_substitution_indexed(&mut session, &request, &root, &mut ledger()?)?;
+    let mut changed = request.clone();
+    changed.targets.swap(0, 1);
+    assert!(matches!(cas.construct_lc_source_substitution_indexed(
+        &mut session, &changed, &root, &mut ledger()?,
+    ), Err(error) if matches!(error.kind, crate::FaultKind::Invalid(_))));
+    // The current closed root schema has one valid transcript per request. A changed
+    // transcript is not another proof and must fail independent replay.
+    let mut bytes = root
+        .certificate(&cas, &mut ledger()?)?
+        .to_bytes(&mut ledger()?)?;
+    let last = bytes.len() - 1;
+    bytes[last] ^= 1;
+    let corrupt = lc_root::Certificate::from_bytes(&bytes, &mut ledger()?)?;
+    assert!(
+        matches!(cas.check_lc_root(&request.root, &corrupt, &mut ledger()?),
+        Err(error) if matches!(error.kind, crate::FaultKind::Invalid(_)))
+    );
+    let statement = wire::scope(&cas, &request, &mut ledger()?)?;
+    assert!(
+        session
+            .lookup(
+                &cas,
+                crate::exact_cache::Kind::Substitution,
+                &statement,
+                Some(b"wrong complete proof"),
+                Some(&root.judgment),
+                &mut ledger()?,
+            )?
+            .is_none()
+    );
+    // Failed replay advances the namespace; the original graph ID is authenticated
+    // again and readmitted with a fresh session serial.
+    let old_serial = session.last_serial();
+    let readmitted = cas.construct_lc_root_indexed(&mut session, &request.root, &mut ledger()?)?;
+    assert_eq!(readmitted.judgment, root.judgment);
+    assert!(session.last_serial() > old_serial);
+    let foreign = source_fixture(Tag::Box)?.2;
+    assert!(matches!(cas.construct_lc_source_substitution_indexed(
+        &mut session, &request, &foreign, &mut ledger()?,
+    ), Err(error) if matches!(error.kind, crate::FaultKind::Invalid(crate::InvalidCode::ForeignHandle))));
+    Ok(())
+}
+
+/// Portable replay reconstructs authority from a receiving store's expected originals.
+/// ´test:unit:exact-cache-root-substitution-expected-replay´
+#[test]
+fn exact_cache_root_substitution_expected_replay() -> TestResult {
+    let (mut source, request) = source_request_fixture(Tag::Box)?;
+    let mut session = ExactCacheSession::new();
+    let root = source.construct_lc_root_indexed(&mut session, &request.root, &mut ledger()?)?;
+    let indexed = source.construct_lc_source_substitution_indexed(
+        &mut session,
+        &request,
+        &root,
+        &mut ledger()?,
+    )?;
+    let certificate = indexed.certificate(&source, &mut ledger()?)?;
+    let (mut receiver, expected) = source_request_fixture(Tag::Box)?;
+    let replayed =
+        receiver.check_lc_source_substitution(&expected, &certificate, &mut ledger()?)?;
+    assert_eq!(replayed.request(&receiver, &mut ledger()?)?, &expected);
+    assert_eq!(receiver.retained_judgment_count(), 1);
+    Ok(())
+}
+
+/// A foreign store cannot use the session, and rollback requires new admission.
+/// ´test:unit:exact-cache-session-foreign-owner-and-epoch-invalidation´
+#[test]
+fn exact_cache_session_foreign_owner_and_epoch_invalidation() -> TestResult {
+    let (mut cas, request) = source_request_fixture(Tag::Box)?;
+    let mut session = ExactCacheSession::new();
+    cas.construct_lc_root_indexed(&mut session, &request.root, &mut ledger()?)?;
+    let serial = session.last_serial();
+    let (mut foreign, other) = source_request_fixture(Tag::Box)?;
+    assert!(
+        matches!(foreign.construct_lc_root_indexed(&mut session, &other.root, &mut ledger()?),
+        Err(error) if matches!(error.kind, crate::FaultKind::Invalid(crate::InvalidCode::ForeignHandle)))
+    );
+    assert!(
+        cas.transaction(&mut ledger()?, |_, _| {
+            Err::<(), _>(Fault::invalid(crate::InvalidCode::Reference, AT))
+        })
+        .is_err()
+    );
+    cas.construct_lc_root_indexed(&mut session, &request.root, &mut ledger()?)?;
+    assert_eq!(session.len(), 1);
+    assert!(session.last_serial() > serial);
+    Ok(())
+}
+
+/// A refused graph suffix invalidates older session references without losing the root.
+/// ´test:unit:exact-cache-substitution-graph-edge-rollback´
+#[test]
+fn exact_cache_substitution_graph_edge_rollback() -> TestResult {
+    let (mut cas, request) = source_request_fixture(Tag::Box)?;
+    let mut session = ExactCacheSession::new();
+    let root = cas.construct_lc_root_indexed(&mut session, &request.root, &mut ledger()?)?;
+    let serial = session.last_serial();
+    let session_bytes = session.retained_bytes();
+    let before = cas.counts();
+    let mut short = Budget::new(Limits {
+        edges: before.edges as u64,
+        ..Limits::default()
+    })?;
+    assert!(
+        cas.construct_lc_source_substitution_indexed(&mut session, &request, &root, &mut short,)
+            .is_err()
+    );
+    assert_eq!(cas.counts(), before);
+    assert_eq!(session.retained_bytes(), session_bytes);
+    cas.construct_lc_root_indexed(&mut session, &request.root, &mut ledger()?)?;
+    assert!(session.last_serial() > serial);
+    Ok(())
+}
+
+/// Public indexed calls refuse an outer graph journal with the existing Reference code.
+/// ´test:unit:exact-cache-indexed-nested-transaction-refusal´
+#[test]
+fn exact_cache_indexed_nested_transaction_refusal() -> TestResult {
+    let (mut cas, request) = source_request_fixture(Tag::Box)?;
+    let mut session = ExactCacheSession::new();
+    let root = cas.construct_lc_root(&request.root, &mut ledger()?)?;
+    cas.transaction(&mut ledger()?, |cas, budget| {
+        let root_error = cas
+            .construct_lc_root_indexed(&mut session, &request.root, budget)
+            .err()
+            .ok_or_else(|| Fault::invalid(crate::InvalidCode::Reference, AT))?;
+        let sub_error = cas
+            .construct_lc_source_substitution_indexed(&mut session, &request, &root, budget)
+            .err()
+            .ok_or_else(|| Fault::invalid(crate::InvalidCode::Reference, AT))?;
+        assert!(matches!(
+            root_error.kind,
+            crate::FaultKind::Invalid(crate::InvalidCode::Reference)
+        ));
+        assert!(matches!(
+            sub_error.kind,
+            crate::FaultKind::Invalid(crate::InvalidCode::Reference)
+        ));
+        Ok(())
+    })?;
+    assert!(session.is_empty());
+    Ok(())
+}
+
+/// Complete-key mismatches are visited in admission order without added Work.
+/// ´test:unit:exact-cache-ordered-probes-batch-collision´
+#[test]
+fn exact_cache_ordered_probes_batch_collision() -> TestResult {
+    let (mut cas, request) = source_request_fixture(Tag::Box)?;
+    let mut session = ExactCacheSession::new();
+    let root = cas.construct_lc_root_indexed(&mut session, &request.root, &mut ledger()?)?;
+    let statement = wire::scope(&cas, &request, &mut ledger()?)?;
+    let mut one = ledger()?;
+    assert!(
+        session
+            .lookup(
+                &cas,
+                crate::exact_cache::Kind::Substitution,
+                &statement,
+                Some(b"wrong complete proof"),
+                Some(&root.judgment),
+                &mut one,
+            )?
+            .is_none()
+    );
+    cas.construct_lc_source_substitution_indexed(&mut session, &request, &root, &mut ledger()?)?;
+    let mut two = ledger()?;
+    assert!(
+        session
+            .lookup(
+                &cas,
+                crate::exact_cache::Kind::Substitution,
+                &statement,
+                Some(b"wrong complete proof"),
+                Some(&root.judgment),
+                &mut two,
+            )?
+            .is_none()
+    );
+    assert_eq!(two.usage().work, one.usage().work);
+    assert_eq!(session.len(), 2);
+    Ok(())
+}
+
+/// Unrelated ordered entries change neither hit lookup nor miss admission Work.
+/// ´test:unit:exact-cache-lookup-and-admission-locality´
+#[test]
+fn exact_cache_lookup_and_admission_locality() -> TestResult {
+    let (mut cas, request) = source_request_fixture(Tag::Box)?;
+    let mut single = ExactCacheSession::new();
+    let mut crowded = ExactCacheSession::new();
+    crowded.seed_unrelated(&cas, &request.targets[0], 64)?;
+    let root = cas.construct_lc_root_indexed(&mut single, &request.root, &mut ledger()?)?;
+    cas.construct_lc_root_indexed(&mut crowded, &request.root, &mut ledger()?)?;
+    let mut root_single = ledger()?;
+    cas.construct_lc_root_indexed(&mut single, &request.root, &mut root_single)?;
+    let mut root_crowded = ledger()?;
+    cas.construct_lc_root_indexed(&mut crowded, &request.root, &mut root_crowded)?;
+    assert_eq!(root_single.usage().work, root_crowded.usage().work);
+
+    cas.construct_lc_source_substitution_indexed(&mut single, &request, &root, &mut ledger()?)?;
+    cas.construct_lc_source_substitution_indexed(&mut crowded, &request, &root, &mut ledger()?)?;
+    let mut sub_single = ledger()?;
+    cas.construct_lc_source_substitution_indexed(&mut single, &request, &root, &mut sub_single)?;
+    let mut sub_crowded = ledger()?;
+    cas.construct_lc_source_substitution_indexed(&mut crowded, &request, &root, &mut sub_crowded)?;
+    assert_eq!(sub_single.usage().work, sub_crowded.usage().work);
+
+    let (mut root_cas_a, root_request_a) = source_request_fixture(Tag::Box)?;
+    let (mut root_cas_b, root_request_b) = source_request_fixture(Tag::Box)?;
+    let mut root_miss_a = ExactCacheSession::new();
+    let mut root_miss_b = ExactCacheSession::new();
+    root_miss_b.seed_unrelated(&root_cas_b, &root_request_b.targets[0], 64)?;
+    let mut cold_a = ledger()?;
+    root_cas_a.construct_lc_root_indexed(&mut root_miss_a, &root_request_a.root, &mut cold_a)?;
+    let mut cold_b = ledger()?;
+    root_cas_b.construct_lc_root_indexed(&mut root_miss_b, &root_request_b.root, &mut cold_b)?;
+    assert_eq!(cold_a.usage().work, cold_b.usage().work);
+
+    let (mut sub_cas_a, sub_request_a) = source_request_fixture(Tag::Box)?;
+    let (mut sub_cas_b, sub_request_b) = source_request_fixture(Tag::Box)?;
+    let sub_root_a = sub_cas_a.construct_lc_root(&sub_request_a.root, &mut ledger()?)?;
+    let sub_root_b = sub_cas_b.construct_lc_root(&sub_request_b.root, &mut ledger()?)?;
+    let mut sub_miss_a = ExactCacheSession::new();
+    let mut sub_miss_b = ExactCacheSession::new();
+    sub_miss_b.seed_unrelated(&sub_cas_b, &sub_request_b.targets[0], 64)?;
+    let mut cold_a = ledger()?;
+    sub_cas_a.construct_lc_source_substitution_indexed(
+        &mut sub_miss_a,
+        &sub_request_a,
+        &sub_root_a,
+        &mut cold_a,
+    )?;
+    let mut cold_b = ledger()?;
+    sub_cas_b.construct_lc_source_substitution_indexed(
+        &mut sub_miss_b,
+        &sub_request_b,
+        &sub_root_b,
+        &mut cold_b,
+    )?;
+    assert_eq!(cold_a.usage().work, cold_b.usage().work);
+    Ok(())
+}
+
+/// Measured warm Work is an exact caller limit; one less refuses after a consumed prefix.
+/// ´test:unit:exact-cache-root-substitution-boundaries´
+#[test]
+fn exact_cache_root_substitution_boundaries() -> TestResult {
+    const PREFIX: u64 = 7;
+    let (mut cas, request) = source_request_fixture(Tag::MappedCover)?;
+    let mut session = ExactCacheSession::new();
+    let root = cas.construct_lc_root_indexed(&mut session, &request.root, &mut ledger()?)?;
+    let retained = cas.construct_lc_source_substitution_indexed(
+        &mut session,
+        &request,
+        &root,
+        &mut ledger()?,
+    )?;
+    let mut measured = ledger()?;
+    cas.construct_lc_source_substitution_indexed(&mut session, &request, &root, &mut measured)?;
+    let work = measured.usage().work;
+    assert!(work > 1);
+    let before = cas.counts();
+    let mut exact = Budget::new(Limits {
+        work: work + PREFIX,
+        ..Limits::default()
+    })?;
+    exact.work(PREFIX, AT)?;
+    cas.construct_lc_source_substitution_indexed(&mut session, &request, &root, &mut exact)?;
+    assert_eq!(exact.usage().work, work + PREFIX);
+    let mut short = Budget::new(Limits {
+        work: work + PREFIX - 1,
+        ..Limits::default()
+    })?;
+    short.work(PREFIX, AT)?;
+    assert!(
+        cas.construct_lc_source_substitution_indexed(&mut session, &request, &root, &mut short,)
+            .is_err()
+    );
+    assert_eq!(work, 237_562);
+    assert_eq!(short.usage().work, 223_758);
+    assert_eq!(cas.counts(), before);
+    let output = cas
+        .retained_judgment_bytes()
+        .saturating_add(retained.retained_bytes());
+    let mut exact_output = Budget::new(Limits {
+        output_bytes: output,
+        ..Limits::default()
+    })?;
+    cas.construct_lc_source_substitution_indexed(&mut session, &request, &root, &mut exact_output)?;
+    let mut short_output = Budget::new(Limits {
+        output_bytes: output - 1,
+        ..Limits::default()
+    })?;
+    assert!(
+        cas.construct_lc_source_substitution_indexed(
+            &mut session,
+            &request,
+            &root,
+            &mut short_output,
+        )
+        .is_err()
+    );
+    assert!(short_output.usage().work > 0);
+    let mut root_work = ledger()?;
+    cas.construct_lc_root_indexed(&mut session, &request.root, &mut root_work)?;
+    let root_work = root_work.usage().work;
+    let mut root_exact = Budget::new(Limits {
+        work: root_work + PREFIX,
+        ..Limits::default()
+    })?;
+    root_exact.work(PREFIX, AT)?;
+    cas.construct_lc_root_indexed(&mut session, &request.root, &mut root_exact)?;
+    assert_eq!(root_exact.usage().work, root_work + PREFIX);
+    let mut root_short = Budget::new(Limits {
+        work: root_work + PREFIX - 1,
+        ..Limits::default()
+    })?;
+    root_short.work(PREFIX, AT)?;
+    assert!(
+        cas.construct_lc_root_indexed(&mut session, &request.root, &mut root_short)
+            .is_err()
+    );
+    assert_eq!(root_work, 163_994);
+    assert_eq!(root_short.usage().work, 157_156);
+
+    check_crowded_byte_limits(&mut cas, &request, &root, &mut session, output, work)?;
+    Ok(())
+}
+
+/// A crowded session meets the uncrowded exact byte ceilings on the same fixture.
+fn check_crowded_byte_limits(
+    cas: &mut Cas,
+    request: &Request,
+    root: &lc_root::Receipt,
+    session: &mut ExactCacheSession,
+    output: u64,
+    work: u64,
+) -> TestResult {
+    // Find the exact staged limit of this uncrowded warm call, then reuse both
+    // exact byte ceilings after many unrelated entries are already resident.
+    let mut lower = 0_u64;
+    let mut upper = Limits::default().staged_payload_bytes;
+    while lower < upper {
+        let middle = lower + (upper - lower) / 2;
+        let mut probe = Budget::new(Limits {
+            staged_payload_bytes: middle,
+            ..Limits::default()
+        })?;
+        if cas
+            .construct_lc_source_substitution_indexed(session, request, root, &mut probe)
+            .is_ok()
+        {
+            upper = middle;
+        } else {
+            lower = middle + 1;
+        }
+    }
+    let staged = upper;
+    let mut uncrowded = Budget::new(Limits {
+        output_bytes: output,
+        staged_payload_bytes: staged,
+        ..Limits::default()
+    })?;
+    cas.construct_lc_source_substitution_indexed(session, request, root, &mut uncrowded)?;
+    let (mut crowded_cas, crowded_request) = source_request_fixture(Tag::MappedCover)?;
+    let mut crowded = ExactCacheSession::new();
+    crowded.seed_unrelated(&crowded_cas, &crowded_request.targets[0], 64)?;
+    let crowded_root = crowded_cas.construct_lc_root_indexed(
+        &mut crowded,
+        &crowded_request.root,
+        &mut ledger()?,
+    )?;
+    let crowded_receipt = crowded_cas.construct_lc_source_substitution_indexed(
+        &mut crowded,
+        &crowded_request,
+        &crowded_root,
+        &mut ledger()?,
+    )?;
+    assert_eq!(
+        crowded_cas
+            .retained_judgment_bytes()
+            .saturating_add(crowded_receipt.retained_bytes()),
+        output
+    );
+    let mut crowded_bytes = Budget::new(Limits {
+        output_bytes: output,
+        staged_payload_bytes: staged,
+        ..Limits::default()
+    })?;
+    crowded_cas.construct_lc_source_substitution_indexed(
+        &mut crowded,
+        &crowded_request,
+        &crowded_root,
+        &mut crowded_bytes,
+    )?;
+    assert_eq!(crowded_bytes.usage().work, work);
     Ok(())
 }
 

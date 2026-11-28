@@ -57,7 +57,7 @@ impl Certificate {
 #[derive(Clone, Debug)]
 pub struct Receipt {
     /// A graph handle authenticates store identity and rollback lifetime.
-    judgment: Handle,
+    pub(crate) judgment: Handle,
     /// Exact graph owner, distinct even for an internal copy sharing logical handle identities.
     owner: Arc<()>,
 }
@@ -108,7 +108,7 @@ impl Cas {
         request: &Request,
         budget: &mut Budget,
     ) -> Result<Receipt, Fault> {
-        run(self, request, None, budget)
+        run(self, request, None, false, 0, budget).map(|result| result.0)
     }
 
     /// Independently replay portable evidence against this store's complete expected original claim.
@@ -121,7 +121,79 @@ impl Cas {
         certificate: &Certificate,
         budget: &mut Budget,
     ) -> Result<Receipt, Fault> {
-        run(self, request, Some(certificate), budget)
+        run(self, request, Some(certificate), false, 0, budget).map(|result| result.0)
+    }
+
+    /// Reuse a checked graph root in one caller-held rollback generation.
+    /// # Errors
+    /// Refuses nested publication, foreign sessions, invalid originals and exhausted resources.
+    pub fn construct_lc_root_indexed(
+        &mut self,
+        session: &mut crate::exact_cache::ExactCacheSession,
+        request: &Request,
+        budget: &mut Budget,
+    ) -> Result<Receipt, Fault> {
+        if self.state.is_journaled() {
+            return Err(Fault::invalid(InvalidCode::Reference, AT));
+        }
+        session.prepare(self)?;
+        {
+            let statement =
+                budget.with_work_phase("lc-root-index", "key-construction", |budget| {
+                    super::wire::scope(self, request, budget)
+                })?;
+            if let Some(judgment) = budget.with_work_phase("lc-root-index", "probe", |budget| {
+                session.lookup(
+                    self,
+                    crate::exact_cache::Kind::Root,
+                    &statement,
+                    None,
+                    None,
+                    budget,
+                )
+            })? {
+                let matches =
+                    budget.with_work_phase("lc-root-index", "authentication", |budget| {
+                        Ok::<_, Fault>(self.lc_root_request(&judgment, budget)? == request)
+                    })?;
+                if matches {
+                    return budget.with_work_phase("lc-root-index", "copy", |budget| {
+                        budget.check(
+                            BudgetKind::OutputBytes,
+                            self.retained_judgment_bytes()
+                                .saturating_add(size_of::<Receipt>() as u64),
+                            AT,
+                        )?;
+                        Ok(Receipt {
+                            judgment,
+                            owner: Arc::clone(&self.memo_owner),
+                        })
+                    });
+                }
+            }
+            let proposal = session.reserve(&statement, budget)?;
+            let (receipt, proof) =
+                budget.with_retained_payload(proposal.retained_bytes(), AT, |budget| {
+                    run(
+                        self,
+                        request,
+                        None,
+                        true,
+                        proposal
+                            .retained_bytes()
+                            .saturating_add(size_of::<Receipt>() as u64),
+                        budget,
+                    )
+                })?;
+            session.admit(
+                crate::exact_cache::Kind::Root,
+                proposal,
+                proof,
+                None,
+                receipt.judgment.clone(),
+            );
+            Ok(receipt)
+        }
     }
 }
 
@@ -130,8 +202,10 @@ fn run(
     cas: &mut Cas,
     request: &Request,
     certificate: Option<&Certificate>,
+    indexed: bool,
+    additional_output: u64,
     budget: &mut Budget,
-) -> Result<Receipt, Fault> {
+) -> Result<(Receipt, Arc<[u8]>), Fault> {
     let previous = budget.restrict_storage(&cas.limits);
     let original_graph = cas
         .counts()
@@ -152,10 +226,15 @@ fn run(
                     .saturating_add(size_of::<Receipt>() as u64);
                 budget.with_retained_payload(live, AT, |budget| {
                     budget.with_work_phase("lc-root", "publication", |budget| {
-                        cas.retain_lc_root(candidate, &wire, budget)
-                            .map(|judgment| Receipt {
-                                judgment,
-                                owner: Arc::clone(&cas.memo_owner),
+                        cas.retain_lc_root(candidate, &wire, indexed, additional_output, budget)
+                            .map(|(judgment, proof)| {
+                                (
+                                    Receipt {
+                                        judgment,
+                                        owner: Arc::clone(&cas.memo_owner),
+                                    },
+                                    proof,
+                                )
                             })
                     })
                 })

@@ -69,12 +69,18 @@ impl Cas {
     }
 
     /// The caller has checked the complete candidate; all fallible publication work precedes append.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the publication preflight and append share one atomic path"
+    )]
     pub(crate) fn retain_lc_root(
         &mut self,
         candidate: Candidate,
         wire: &[u8],
+        indexed: bool,
+        additional_output: u64,
         budget: &mut Budget,
-    ) -> Result<Handle, Fault> {
+    ) -> Result<(Handle, Arc<[u8]>), Fault> {
         let bytes = candidate_bytes(&candidate)
             .saturating_add(wire.len() as u64)
             .saturating_add(2)
@@ -113,14 +119,23 @@ impl Cas {
             self.state.intern.get(key.as_ref(), floor, budget, AT)
         })?;
         if let Some(id) = existing.copied() {
-            budget.check(BudgetKind::OutputBytes, self.state.judgment_bytes, AT)?;
+            budget.check(
+                BudgetKind::OutputBytes,
+                self.state.judgment_bytes.saturating_add(additional_output),
+                AT,
+            )?;
             let handle = self.handle(id);
             if self.lc_root_request(&handle, budget)? != &candidate.original {
                 return Err(invalid());
             }
-            return Ok(handle);
+            let proof = if indexed {
+                Arc::clone(&self.lc_root_node(&handle, budget)?.key)
+            } else {
+                key
+            };
+            return Ok((handle, proof));
         }
-        preflight(self, count, bytes, budget)?;
+        preflight(self, count, bytes, additional_output, budget)?;
         let mut dependencies = Vec::new();
         dependencies
             .try_reserve_exact(count)
@@ -156,6 +171,7 @@ impl Cas {
             key: Some(Arc::clone(&key).into()),
             policy: None,
         })?;
+        let proof = Arc::clone(&key);
         append(
             self,
             id,
@@ -170,7 +186,7 @@ impl Cas {
             next_count,
             source,
         );
-        Ok(self.handle(id))
+        Ok((self.handle(id), proof))
     }
 }
 
@@ -231,14 +247,23 @@ fn append(
 }
 
 /// Check permanent and temporary store bounds before reserving a durable identity.
-fn preflight(cas: &Cas, count: usize, bytes: u64, budget: &mut Budget) -> Result<(), Fault> {
+fn preflight(
+    cas: &Cas,
+    count: usize,
+    bytes: u64,
+    additional_output: u64,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
     let nodes = size(cas.state.graph.node_count(), AT)?.saturating_add(1);
     let edges = size(cas.state.graph.edge_count(), AT)?
         .saturating_add(count as u64)
         .saturating_add(1);
     budget.check(
         BudgetKind::OutputBytes,
-        cas.state.judgment_bytes.saturating_add(bytes),
+        cas.state
+            .judgment_bytes
+            .saturating_add(bytes)
+            .saturating_add(additional_output),
         AT,
     )?;
     let unregistered =

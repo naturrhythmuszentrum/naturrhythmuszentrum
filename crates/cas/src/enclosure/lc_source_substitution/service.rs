@@ -38,13 +38,13 @@ impl Certificate {
 #[derive(Clone, Debug)]
 pub struct Receipt {
     /// Complete original statement.
-    request: Request,
+    pub(crate) request: Request,
     /// Live registered root theorem.
-    root: lc_root::Receipt,
+    pub(crate) root: lc_root::Receipt,
     /// Portable checked proposal, copied on export.
-    wire: Vec<u8>,
+    pub(crate) wire: Vec<u8>,
     /// Exact receiving-store owner.
-    owner: Arc<()>,
+    pub(crate) owner: Arc<()>,
 }
 
 impl Receipt {
@@ -88,6 +88,98 @@ impl Receipt {
 }
 
 impl Cas {
+    /// Reuse or publish a graph-owned source substitution for one particular root proof.
+    /// # Errors
+    /// Refuses nested publication, foreign sessions, changed originals and exhausted resources.
+    pub fn construct_lc_source_substitution_indexed(
+        &mut self,
+        session: &mut crate::exact_cache::ExactCacheSession,
+        request: &Request,
+        root: &lc_root::Receipt,
+        budget: &mut Budget,
+    ) -> Result<Receipt, Fault> {
+        if self.state.is_journaled() {
+            return Err(Fault::invalid(InvalidCode::Reference, AT));
+        }
+        session.prepare(self)?;
+        {
+            let scope =
+                budget.with_work_phase("lc-substitution-index", "key-construction", |budget| {
+                    wire::scope(self, request, budget)
+                })?;
+            let root_wire =
+                budget.with_work_phase("lc-substitution-index", "key-construction", |budget| {
+                    root.certificate(self, budget)?.to_bytes(budget)
+                })?;
+            let wire =
+                budget.with_work_phase("lc-substitution-index", "key-construction", |budget| {
+                    wire::encode(&scope, &root_wire, budget)
+                })?;
+            if let Some(judgment) =
+                budget.with_work_phase("lc-substitution-index", "probe", |budget| {
+                    session.lookup(
+                        self,
+                        crate::exact_cache::Kind::Substitution,
+                        &scope,
+                        Some(&wire),
+                        Some(&root.judgment),
+                        budget,
+                    )
+                })?
+            {
+                let retained = budget.with_work_phase(
+                    "lc-substitution-index",
+                    "authentication",
+                    |budget| self.lc_source_substitution_receipt(&judgment, budget),
+                )?;
+                if &retained.request == request && retained.root.judgment == root.judgment {
+                    return budget.with_work_phase("lc-substitution-index", "copy", |budget| {
+                        budget.check(
+                            BudgetKind::OutputBytes,
+                            self.retained_judgment_bytes()
+                                .saturating_add(retained.retained_bytes()),
+                            AT,
+                        )?;
+                        retain(
+                            self,
+                            &retained.request,
+                            &retained.root,
+                            &retained.wire,
+                            budget,
+                        )
+                    });
+                }
+            }
+            let proposal = session.reserve(&scope, budget)?;
+            let (receipt, judgment, proof) =
+                budget.with_retained_payload(proposal.retained_bytes(), AT, |budget| {
+                    check::verify(self, request, root, budget)?;
+                    let receipt = retain(self, request, root, &wire, budget)?;
+                    let (judgment, proof) =
+                        budget.with_retained_payload(receipt.retained_bytes(), AT, |budget| {
+                            self.transaction(budget, |cas, budget| {
+                                cas.retain_lc_source_substitution(
+                                    receipt.clone(),
+                                    proposal
+                                        .retained_bytes()
+                                        .saturating_add(receipt.retained_bytes()),
+                                    budget,
+                                )
+                            })
+                        })?;
+                    Ok((receipt, judgment, proof))
+                })?;
+            session.admit(
+                crate::exact_cache::Kind::Substitution,
+                proposal,
+                proof,
+                Some(root.judgment.clone()),
+                judgment,
+            );
+            Ok(receipt)
+        }
+    }
+
     /// Compose a checked registered root with one original source grammar.
     /// # Errors
     /// Refuses unsupported source syntax, an invalid root or exhausted resources.
