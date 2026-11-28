@@ -138,7 +138,7 @@ The gate fetches the candidate and checks commit policy over every commit past t
 
 The gate runs the following checks:
 
-- The pinned nightly rustfmt check.
+- The workspace nightly rustfmt check (`dec:nrz:toolchain-tracks-nightly`).
 - `cargo clippy --workspace --all-targets -- -D warnings`.
 - `cargo doc --no-deps` with documentation warnings denied.
 - `cargo test --workspace --no-fail-fast`.
