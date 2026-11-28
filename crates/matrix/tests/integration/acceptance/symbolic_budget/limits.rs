@@ -18,7 +18,7 @@ use nrz_bindings::{
 #[test]
 fn full_ladder_symbolic_work_has_explicit_boundary() -> ResultOf {
     let baseline = lower(16_000_000, 16_000_000)?.jacobian().work();
-    let needed = 4_916_627;
+    let needed = 4_916_629;
     assert_eq!(
         lower(needed, 16_000_000)?.jacobian().work().requests,
         baseline.requests
@@ -51,7 +51,7 @@ fn full_ladder_symbolic_work_has_explicit_boundary() -> ResultOf {
         // graph charges = 1,705,231. The interning-lookup floor is 20,726 on both sides.
         // Replay maximum: 2,174,460 + 380 retained-kind counts + 7 local counts
         // + 394 identity insertions + 394 vertex admissions = 2,175,635.
-        (4_916_627, 1_705_231, 4_922_310, 2_175_635)
+        (4_916_629, 1_705_231, 4_922_344, 2_175_635)
     );
     Ok(())
 }

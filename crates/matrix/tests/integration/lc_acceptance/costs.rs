@@ -10,9 +10,9 @@ const OWNERS: [[u64; 3]; 6] = [
     [169, 2_952, 0],
     [593_488, 65_170, 13_336],
     [2_574, 616, 0],
-    [44_158, 64_104, 64_312],
-    [41_085, 64_568, 64_776],
-    [41_133, 128_864, 129_040],
+    [44_270, 64_152, 64_360],
+    [41_197, 64_616, 64_824],
+    [41_245, 128_960, 129_136],
 ];
 
 /// Each operation charges its measured Work and refuses immediately below each positive resource boundary.
@@ -25,7 +25,11 @@ fn lc_acceptance_owner_costs_and_boundaries() -> TestResult {
         case.run(operation, &mut resources)?;
         assert_eq!(resources.usage().work, profile[0]);
         for (kind, needed) in profile.into_iter().enumerate() {
-            assert!(case.run(operation, &mut policy(kind, needed, 0)?).is_ok());
+            let result = case.run(operation, &mut policy(kind, needed, 0)?);
+            assert!(
+                result.is_ok(),
+                "operation {operation}, kind {kind}, needed {needed}: {result:?}"
+            );
             if needed > 0 {
                 assert!(
                     case.run(operation, &mut policy(kind, needed - 1, 0)?)

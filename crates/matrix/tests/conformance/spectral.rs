@@ -51,7 +51,7 @@ fn lc_spectral_numerical_payload_boundaries() -> TestResult {
     let plan = fixture.plan(inputs.clone(), &mut ledger()?)?;
     let context = ArithmeticContext::new()?;
     for (kind, requirements) in [
-        (BudgetKind::StagedPayloadBytes, [88_266, 1064]),
+        (BudgetKind::StagedPayloadBytes, [88_290, 1064]),
         (BudgetKind::OutputBytes, [14_793, 680]),
     ] {
         for (planning, required) in [true, false].into_iter().zip(requirements) {
@@ -76,7 +76,10 @@ fn lc_spectral_numerical_payload_boundaries() -> TestResult {
                     )
                     .is_ok())
             };
-            assert!(attempt(required, 0)?);
+            assert!(
+                attempt(required, 0)?,
+                "kind {kind:?}, planning {planning}, required {required}"
+            );
             assert!(!attempt(required - 1, 0)?);
             if kind == BudgetKind::StagedPayloadBytes {
                 assert!(attempt(required + 23, 23)?);

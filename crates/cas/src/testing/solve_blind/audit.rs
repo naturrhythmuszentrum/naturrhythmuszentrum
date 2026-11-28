@@ -92,7 +92,7 @@ fn policy_record() -> String {
             (specification.key, specification.version)
         })
         .collect();
-    assert_eq!(manifest.len(), 101);
+    assert_eq!(manifest.len(), 102);
     assert!(manifest.iter().all(|(key, version)| *version
         == if matches!(*key, "region.decide" | "solve.split") {
             2
@@ -101,9 +101,9 @@ fn policy_record() -> String {
         }));
     assert_eq!(crate::solving::active_schema_bitmap() & 0x1_5fff, 0x1_5fff);
     let policy = crate::cost::CostPolicy::default();
-    assert_eq!((&*policy.key, policy.version), ("logical", 21));
+    assert_eq!((&*policy.key, policy.version), ("logical", 22));
     format!(
-        "policy=logical-v21\nschema_manifest={manifest:?}\nactive_bitmap={}\n",
+        "policy=logical-v22\nschema_manifest={manifest:?}\nactive_bitmap={}\n",
         crate::solving::active_schema_bitmap()
     )
 }

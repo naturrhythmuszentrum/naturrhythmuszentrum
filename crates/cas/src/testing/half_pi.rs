@@ -10,7 +10,8 @@ use crate::test_api::proof::{
     ApplicationDraft, Certificate, DomainContract, Judgment, Primitive, Statement,
 };
 use crate::test_api::syntax::{
-    Constant, Declaration, Draft, Environment, ExpressionDraft, Operator, PredicateKind,
+    AtomicSort, Constant, Declaration, Draft, Environment, ExpressionDraft, Field, Operator,
+    PredicateKind, Sort,
 };
 use crate::test_api::{Cas, Handle, Rational, Reference};
 
@@ -57,15 +58,36 @@ pub(crate) fn prepared(
     zero: bool,
     reordered: bool,
 ) -> TestResult<Fixture> {
+    prepared_with_opaque(integer, coefficient, zero, reordered, false)
+}
+
+pub(crate) fn prepared_with_opaque(
+    integer: &str,
+    coefficient: &str,
+    zero: bool,
+    reordered: bool,
+    opaque: bool,
+) -> TestResult<Fixture> {
     let mut cas = Cas::new(default_budget()?.limits().clone())?;
+    let mut declarations = vec![Declaration {
+        key: "x".into(),
+        display_name: "x".into(),
+        sort: real(),
+    }];
+    if opaque {
+        declarations.push(Declaration {
+            key: "sine".into(),
+            display_name: "sine".into(),
+            sort: Sort::Function {
+                inputs: vec![AtomicSort::Scalar(Field::Real)],
+                output: AtomicSort::Scalar(Field::Real),
+            },
+        });
+    }
     let header = admit(
         &mut cas,
         Draft::Header(HeaderDraft::Core(Environment {
-            declarations: vec![Declaration {
-                key: "x".into(),
-                display_name: "x".into(),
-                sort: real(),
-            }],
+            declarations,
             ..Environment::default()
         })),
     )?;

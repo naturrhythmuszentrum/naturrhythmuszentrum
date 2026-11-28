@@ -211,8 +211,8 @@ impl Frame {
 #[test]
 fn integer_case_family_boundary() -> TestResult {
     for (bounded, declaration, admission, partition, selection) in [
-        (false, 16_330, 6_924, 530, 647_680),
-        (true, 18_542, 7_560, 1_390, 703_243),
+        (false, 16_330, 6_924, 530, 647_746),
+        (true, 18_542, 7_560, 1_390, 703_309),
     ] {
         let mut frame = Frame::new()?;
         let (region, [coordinate, value]) = frame.relation(bounded)?;

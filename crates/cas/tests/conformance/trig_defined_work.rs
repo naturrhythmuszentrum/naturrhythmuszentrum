@@ -299,7 +299,7 @@ fn coverage_attempt(work: u64) -> TestResult<(bool, u64)> {
 /// floors equally. Other `Cas::run` ledgers are excluded from this receipt.
 #[test]
 fn trig_defined_coverage_request_boundary() -> TestResult {
-    assert_eq!(coverage_attempt(203_203)?, (true, 203_203));
-    assert_eq!(coverage_attempt(203_202)?, (false, 202_611));
+    assert_eq!(coverage_attempt(203_269)?, (true, 203_269));
+    assert_eq!(coverage_attempt(203_268)?, (false, 202_677));
     Ok(())
 }

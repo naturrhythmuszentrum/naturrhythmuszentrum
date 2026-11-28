@@ -17,6 +17,7 @@ use crate::proof_model::{
 use crate::rule::Primitive;
 
 pub(crate) mod defined;
+pub(crate) mod joint;
 mod minus_one;
 pub use minus_one::TrigRecipeOutcome;
 pub(crate) mod parity;

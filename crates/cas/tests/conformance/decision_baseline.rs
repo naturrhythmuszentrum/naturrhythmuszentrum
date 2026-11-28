@@ -290,34 +290,34 @@ const COSTS: [Costs; 3] = [
     Costs {
         example: Example::Integer,
         admission: 29_322,
-        generation: 958_417,
+        generation: 958_515,
         checking: 1_715_916,
         selection_replay: 1_715_916,
         staged: [20_816, 169_741],
-        payload: [14_095, 38_348],
-        added: [2_055, 16_339],
+        payload: [14_095, 38_444],
+        added: [2_055, 16_435],
         witness: [783, 1_610],
     },
     Costs {
         example: Example::Sign,
         admission: 29_362,
-        generation: 744_522,
+        generation: 744_620,
         checking: 1_337_063,
         selection_replay: 1_337_063,
         staged: [20_848, 168_496],
-        payload: [11_645, 32_092],
-        added: [2_055, 16_285],
+        payload: [11_645, 32_188],
+        added: [2_055, 16_381],
         witness: [785, 1_391],
     },
     Costs {
         example: Example::Phase,
         admission: 43_808,
-        generation: 209_959,
+        generation: 210_025,
         checking: 0,
         selection_replay: 0,
-        staged: [33_120, 39_710],
-        payload: [18_188, 36_250],
-        added: [2_079, 11_555],
+        staged: [33_120, 39_806],
+        payload: [18_188, 36_346],
+        added: [2_079, 11_651],
         witness: [1_193, 0],
     },
 ];
@@ -482,7 +482,11 @@ fn decision_baseline_selection_boundaries() -> TestResult {
             (BudgetKind::StagedPayloadBytes, costs.staged[1]),
             (BudgetKind::PayloadBytes, costs.payload[1]),
         ] {
-            assert!(selection_attempt(&costs, kind, needed)?);
+            assert!(
+                selection_attempt(&costs, kind, needed)?,
+                "{:?}:{kind:?}:{needed}",
+                costs.example
+            );
             assert!(!selection_attempt(&costs, kind, needed - 1)?);
         }
         if costs.selection_replay != 0 {

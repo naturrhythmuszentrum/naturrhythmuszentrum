@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Closed Real syntax admits no trigonometric rule authority.
+//! Closed Real trigonometric syntax and its checked symbolic rule authority.
 
 use crate::testing::common::{TestResult, default_budget, real};
 use crate::testing::trig::{Fixture, operators};
@@ -227,6 +227,250 @@ fn trig_enclosure_preflight_refusal() -> TestResult {
         assert_eq!(report.completed_rounds, 0);
         assert!(report.checked.is_none());
         assert_eq!(f.cas.canonical_snapshot(&mut default_budget()?)?, before);
+    }
+    Ok(())
+}
+
+/// The original common-argument circular law is a consumable equality on its exact domain.
+/// ´test:integration:trig-pythagorean-original-equality´
+#[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "public producer, distinct receiving store, and exact replay budget share one claim"
+)]
+fn trig_pythagorean_original_equality() -> TestResult {
+    use crate::testing::half_pi::{prepared, term};
+    use nrz_cas::proof::{DomainContract, Statement};
+    use nrz_cas::{
+        Location,
+        limits::{Budget, BudgetKind, Limits},
+    };
+    let mut f = prepared("0", "0", true, false)?;
+    let Statement::HalfPiWitness { u, .. } = &f.expected.statement else {
+        return Err("original Real argument".into());
+    };
+    let argument = u.clone();
+    let sine = term(
+        &mut f.cas,
+        &f.header,
+        Operator::Sine,
+        std::slice::from_ref(&argument),
+    )?;
+    let cosine = term(
+        &mut f.cas,
+        &f.header,
+        Operator::Cosine,
+        std::slice::from_ref(&argument),
+    )?;
+    let sine_square = term(
+        &mut f.cas,
+        &f.header,
+        Operator::IntegerPower(2),
+        std::slice::from_ref(&sine),
+    )?;
+    let cosine_square = term(
+        &mut f.cas,
+        &f.header,
+        Operator::IntegerPower(2),
+        std::slice::from_ref(&cosine),
+    )?;
+    let sum = term(
+        &mut f.cas,
+        &f.header,
+        Operator::Add,
+        &[sine_square, cosine_square],
+    )?;
+    let one = term(
+        &mut f.cas,
+        &f.header,
+        Operator::Rational(Rational::one()),
+        &[],
+    )?;
+    let guard = f
+        .cas
+        .check_proof(&f.context, &f.steps[..1], &mut default_budget()?)?;
+    let witness = f
+        .cas
+        .trig_joint(&argument, guard.proof(), &mut default_budget()?)?;
+    assert_eq!(
+        witness.judgment().statement,
+        Statement::Equality {
+            left: sum,
+            right: one,
+            domain: f.domain,
+            domain_contract: DomainContract::DefinedAndEqual,
+        }
+    );
+    let bytes = f.cas.export_witness(&witness, &mut default_budget()?)?;
+    assert_eq!(bytes.len(), 781); // Measured complete canonical witness.
+    for (allowance, succeeds) in [(780, false), (781, true)] {
+        let mut budget = Budget::new(Limits {
+            witness_bytes: allowance,
+            ..Limits::default()
+        })?;
+        let before = f.cas.canonical_snapshot(&mut default_budget()?)?;
+        let result = f.cas.export_witness(&witness, &mut budget);
+        if succeeds {
+            assert_eq!(result?, bytes);
+        } else {
+            let fault = result.err().ok_or("witness byte N-1 accepted")?;
+            assert!(matches!(
+                fault.kind,
+                FaultKind::Exhausted {
+                    budget: BudgetKind::WitnessBytes,
+                    ..
+                }
+            ));
+            assert_eq!(f.cas.canonical_snapshot(&mut default_budget()?)?, before);
+        }
+    }
+    for (allowance, consumed, succeeds) in
+        [(34_183, 7, true), (34_182, 7, false), (34_183, 8, false)]
+    {
+        let mut producer = prepared("0", "0", true, false)?;
+        let Statement::HalfPiWitness { u, .. } = &producer.expected.statement else {
+            return Err("producer Real argument".into());
+        };
+        let argument = u.clone();
+        let sine = term(
+            &mut producer.cas,
+            &producer.header,
+            Operator::Sine,
+            std::slice::from_ref(&argument),
+        )?;
+        let cosine = term(
+            &mut producer.cas,
+            &producer.header,
+            Operator::Cosine,
+            std::slice::from_ref(&argument),
+        )?;
+        let sine_square = term(
+            &mut producer.cas,
+            &producer.header,
+            Operator::IntegerPower(2),
+            std::slice::from_ref(&sine),
+        )?;
+        let cosine_square = term(
+            &mut producer.cas,
+            &producer.header,
+            Operator::IntegerPower(2),
+            std::slice::from_ref(&cosine),
+        )?;
+        term(
+            &mut producer.cas,
+            &producer.header,
+            Operator::Add,
+            &[sine_square, cosine_square],
+        )?;
+        term(
+            &mut producer.cas,
+            &producer.header,
+            Operator::Rational(Rational::one()),
+            &[],
+        )?;
+        let guard = producer.cas.check_proof(
+            &producer.context,
+            &producer.steps[..1],
+            &mut default_budget()?,
+        )?;
+        let mut budget = Budget::new(Limits {
+            work: allowance,
+            ..Limits::default()
+        })?;
+        budget.work(consumed, Location::new("prior joint Work"))?;
+        let before = producer.cas.canonical_snapshot(&mut default_budget()?)?;
+        let result = producer
+            .cas
+            .trig_joint(&argument, guard.proof(), &mut budget);
+        if succeeds {
+            assert!(result.is_ok());
+            assert_eq!(budget.usage().work, allowance);
+        } else {
+            let fault = result.err().ok_or("joint Work N-1 accepted")?;
+            assert!(matches!(
+                fault.kind,
+                FaultKind::Exhausted {
+                    budget: BudgetKind::Work,
+                    ..
+                }
+            ));
+            assert_eq!(
+                producer.cas.canonical_snapshot(&mut default_budget()?)?,
+                before
+            );
+        }
+    }
+    let mut receiver = prepared("0", "0", true, true)?;
+    let Statement::HalfPiWitness { u, .. } = &receiver.expected.statement else {
+        return Err("receiving Real argument".into());
+    };
+    let receiving_argument = u.clone();
+    let receiving_sine = term(
+        &mut receiver.cas,
+        &receiver.header,
+        Operator::Sine,
+        std::slice::from_ref(&receiving_argument),
+    )?;
+    let receiving_cosine = term(
+        &mut receiver.cas,
+        &receiver.header,
+        Operator::Cosine,
+        std::slice::from_ref(&receiving_argument),
+    )?;
+    let receiving_sine_square = term(
+        &mut receiver.cas,
+        &receiver.header,
+        Operator::IntegerPower(2),
+        std::slice::from_ref(&receiving_sine),
+    )?;
+    let receiving_cosine_square = term(
+        &mut receiver.cas,
+        &receiver.header,
+        Operator::IntegerPower(2),
+        std::slice::from_ref(&receiving_cosine),
+    )?;
+    let receiving_sum = term(
+        &mut receiver.cas,
+        &receiver.header,
+        Operator::Add,
+        &[receiving_sine_square, receiving_cosine_square],
+    )?;
+    let receiving_one = term(
+        &mut receiver.cas,
+        &receiver.header,
+        Operator::Rational(Rational::one()),
+        &[],
+    )?;
+    receiver.expected.statement = Statement::Equality {
+        left: receiving_sum,
+        right: receiving_one,
+        domain: receiver.domain.clone(),
+        domain_contract: DomainContract::DefinedAndEqual,
+    };
+    for (allowance, succeeds) in [(61_624, false), (61_625, true)] {
+        let mut budget = Budget::new(Limits {
+            work: allowance,
+            ..nrz_cas::limits::Limits::default()
+        })?;
+        let before = receiver.cas.canonical_snapshot(&mut default_budget()?)?;
+        let result = receiver.cas.replay(&bytes, &receiver.expected, &mut budget);
+        if succeeds {
+            assert_eq!(result?.judgment(), &receiver.expected);
+            assert_eq!(budget.usage().work, allowance);
+        } else {
+            let fault = result.err().ok_or("replay Work N-1 accepted")?;
+            assert!(matches!(
+                fault.kind,
+                FaultKind::Exhausted {
+                    budget: BudgetKind::Work,
+                    ..
+                }
+            ));
+            assert_eq!(
+                receiver.cas.canonical_snapshot(&mut default_budget()?)?,
+                before
+            );
+        }
     }
     Ok(())
 }

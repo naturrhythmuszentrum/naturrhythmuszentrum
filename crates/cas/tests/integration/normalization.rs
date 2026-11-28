@@ -241,6 +241,6 @@ fn normalization_resource_measurements() -> TestResult {
     ];
     // Previous proof/replay Work 573160/683997; each adds 8 retained kinds
     // + 8 identity insertions + 8 vertex admissions = 24. Key is unchanged.
-    assert_eq!(row, [573_184, 684_021, 1_882, 158_429, 4_168]);
+    assert_eq!(row, [573_184, 684_021, 1_882, 158_517, 4_192]);
     Ok(())
 }

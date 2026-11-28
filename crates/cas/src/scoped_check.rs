@@ -192,6 +192,7 @@ fn rule_conditions(
         }
         Primitive::DefinedTotal => crate::defined_total::check(cas, draft, premises, budget)?,
         Primitive::TrigDefined => crate::trig::defined::check(cas, draft, premises, budget)?,
+        Primitive::TrigJoint => crate::trig::joint::check(cas, draft, premises, budget)?,
         Primitive::HalfPiWitness => crate::trig::check(cas, draft, premises, budget)?,
         Primitive::SinHalfPi | Primitive::CosHalfPi | Primitive::AtanZero | Primitive::AtanOne => {
             crate::trig::value_check(cas, draft, premises, budget)?

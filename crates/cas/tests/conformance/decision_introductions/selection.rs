@@ -107,10 +107,10 @@ fn decision_certified_selection_costs() -> TestResult {
         [
             (
                 "Integer".into(),
-                ("proved".into(), 385_277, 1_439_080, 3_186)
+                ("proved".into(), 385_375, 1_439_080, 3_186)
             ),
-            ("Sign".into(), ("proved".into(), 126_209, 614_936, 1_844)),
-            ("Phase".into(), ("pending".into(), 128_860, 0, 0)),
+            ("Sign".into(), ("proved".into(), 126_307, 614_936, 1_844)),
+            ("Phase".into(), ("pending".into(), 128_926, 0, 0)),
         ]
     );
     Ok(())
@@ -313,10 +313,10 @@ fn decision_certified_selection_boundaries() -> TestResult {
     for (example, amounts) in [
         (
             Example::Integer,
-            [377_798, 1_439_080, 166_333, 94_315, 3_186],
+            [377_864, 1_439_080, 166_333, 94_411, 3_186],
         ),
-        (Example::Sign, [120_072, 614_936, 161_277, 47_229, 1_844]),
-        (Example::Phase, [128_860, 0, 92_320, 89_739, 0]),
+        (Example::Sign, [120_138, 614_936, 161_277, 47_325, 1_844]),
+        (Example::Phase, [128_926, 0, 92_416, 89_835, 0]),
     ] {
         for (kind, amount) in [
             BudgetKind::Work,

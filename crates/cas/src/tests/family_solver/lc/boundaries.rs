@@ -32,7 +32,7 @@ fn checked(result: TestResult, used: u64, required: u64, short: u64) -> TestResu
 /// ´test:crate:stable-collection-lc-request-work-boundaries´
 #[test]
 fn request_work_boundaries() -> TestResult {
-    for (signs, required) in [([1, 1], 823_812), ([0, 1], 458_432), ([1, 0], 456_020)] {
+    for (signs, required) in [([1, 1], 823_878), ([0, 1], 458_498), ([1, 0], 456_086)] {
         for short in [0, 1] {
             let (mut source, mut request) = super::fixture::request(signs, true)?;
             request.limits.work = Some(required - short);

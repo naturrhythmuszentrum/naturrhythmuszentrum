@@ -63,23 +63,25 @@ fn reciprocal_source_jacobian_reuses_original_graph() -> TestResult {
             budget.usage().work - first.usage().after.work,
             first.retained_payload_bytes()
         ),
-        (812_525, 328_804, 4_816_828, 8_505, 110_473)
+        (812_613, 329_052, 4_816_828, 8_553, 110_593)
     );
     Ok(())
 }
 
 /// Fixed declarations remain original positive denominators and introduce no derivative column.
-/// First fixed derivative: unchanged operation Work 3,845,341 +478 retained counts +16 first-kind
-/// insertions +510 identity insertions +510 vertex admissions = 3,846,855.
-/// Second: unchanged operation Work 2,917,358 +86 +16 +118 +118 = 2,917,696.
-/// The cumulative unchanged operation Work 8,123,364 adds prove +72 and those +1,514/+338
-/// to reach 8,125,288; old/new lookup floors match.
+/// First fixed derivative: 3,845,341 operation Work + 478 retained counts + 16
+/// first-kind insertions + 510 identity insertions + 510 vertex admissions =
+/// 3,846,855; the measured policy-key and manifest walk adds 248 to 3,847,103.
+/// Second: 2,917,358 operation Work + 86 + 16 + 118 + 118 = 2,917,696;
+/// the measured walk adds 296 to 2,917,992. The caller's 8,123,364 operation
+/// Work + 72 prove + 1,514 + 338 = 8,125,288; the measured walk adds 1,104
+/// to 8,126,392. The earlier and current lookup floors match.
 /// ´test:integration:reciprocal-source-jacobian-keeps-fixed-input-domains´
 #[test]
 fn reciprocal_source_jacobian_keeps_fixed_input_domains() -> TestResult {
     let limits = Limits {
-        work: 8_125_288,
-        replay_work: 8_125_288,
+        work: 8_126_392,
+        replay_work: 8_126_392,
         ..Limits::default()
     };
     let mut prepared = plan_with_policy(limits.clone(), false)?;
@@ -125,20 +127,21 @@ fn reciprocal_source_jacobian_keeps_fixed_input_domains() -> TestResult {
     assert_eq!(cache.len(), 2);
     assert_eq!(
         (costs, budget.usage().work),
-        (vec![3_846_855, 2_917_696], 8_125_288)
+        (vec![3_847_103, 2_917_992], 8_126_392)
     );
     Ok(())
 }
 
 /// Complete construction, derivation and reuse consume one allowance across requests and retries.
-/// Unchanged operation Work 5,964,692 +72 prove +12 key +1,886 derivative = 5,966,662.
+/// 5,964,692 operation Work + 72 prove + 12 key + 1,886 derivative = 5,966,662;
+/// the longer policy key and manifest walk adds a measured 384 to 5,967,046.
 /// ´test:integration:reciprocal-source-jacobian-cumulative-boundary´
 #[test]
 fn reciprocal_source_jacobian_cumulative_boundary() -> TestResult {
     let mut measured = Budget::new(policy())?;
     pipeline(&mut measured)?;
     let required = measured.usage().work;
-    assert_eq!(required, 5_966_662);
+    assert_eq!(required, 5_967_046);
     for ceiling in [required, required - 1] {
         let mut budget = Budget::new(Limits {
             work: ceiling,
@@ -175,8 +178,8 @@ fn pipeline(budget: &mut Budget) -> TestResult {
 /// Exact measured recipe, key, native derivative and one cache hit, including 17 prior Work.
 fn policy() -> Limits {
     Limits {
-        work: 5_966_662,
-        replay_work: 5_966_662,
+        work: 5_967_046,
+        replay_work: 5_967_046,
         ..Limits::default()
     }
 }

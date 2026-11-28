@@ -29,7 +29,7 @@ fn lc_spectral_publishes_complete_conjugate_family() -> TestResult {
             fixture.physical_construction_work,
             fixture.outputs.as_ref().ok_or("outputs")?.definition_work
         ),
-        (123, 5_166, 503_608, 933_148, 227_968, 1_613_704, 13_763)
+        (123, 5_166, 503_608, 933_148, 227_968, 1_613_792, 13_763)
     );
     Ok(())
 }

@@ -153,16 +153,18 @@ fn quantity_product_sensitivity_refusal_twins() -> TestResult {
 /// ´claim:bindings:quantity-product-sensitivity-work-boundary´ Product sensitivity accepts its literal cumulative allowance, charges only actual preparation and four service receipts, and preserves named exhaustion and spent Work one unit below.
 #[test]
 fn quantity_product_sensitivity_work_boundary() -> TestResult {
-    // Successful consumed Work: 818,887 unchanged operations and lookup + 677 local entries
-    // = 819,564, where 677 is
-    // 162 retained kinds + 39 local kinds + 240 identity + 220 vertices
-    // + 8 occurrences + 6 sources + 2 policy. The N-1 prefix similarly
-    // gains 152+32+216+198+8+6+2 = 614, from 721941 to 722555.
-    // The service split reserves 878,917: 878,136 unchanged service allowance
-    // + 399 local-entry Work before service three + 2*191 replay Work.
+    // Successful consumed Work: 818,887 operations and lookup + 677 local entries
+    // = 819,564, where 677 is 162 retained kinds + 39 local kinds + 240 identity
+    // + 220 vertices + 8 occurrences + 6 sources + 2 policy. The longer policy
+    // key and manifest walk adds a measured 200, reaching 819,764. The N-1
+    // prefix was 721,941 + 152 + 32 + 216 + 198 + 8 + 6 + 2 = 722,555;
+    // its measured manifest walk adds 134, reaching 722,689. The service split
+    // reserved 878,136 service allowance + 399 local-entry Work before service
+    // three + 2*191 replay Work = 878,917; its measured manifest walk adds 132,
+    // reaching 879,049. The reservation sets this separate boundary.
     for accepted in [false, true] {
         let mut budget = Budget::new(Limits {
-            work: if accepted { 878_917 } else { 878_916 },
+            work: if accepted { 879_049 } else { 879_048 },
             ..Limits::default()
         })?;
         let ratio = Descriptor::ratio();
@@ -173,12 +175,12 @@ fn quantity_product_sensitivity_work_boundary() -> TestResult {
         );
         if accepted {
             let proof = result?;
-            assert_eq!(budget.usage().work, 819_564);
+            assert_eq!(budget.usage().work, 819_764);
             assert_eq!(
                 proof.jacobian().work(),
                 nrz_bindings::SensitivityWork {
                     construction: 24_989,
-                    generation: 73_317,
+                    generation: 73_415,
                     replay: 218_348,
                     requests: 4,
                 }
@@ -199,7 +201,7 @@ fn quantity_product_sensitivity_work_boundary() -> TestResult {
                 *outcome,
                 nrz_cas::request::Outcome::Exhausted { .. }
             ));
-            assert_eq!(budget.usage().work, 722_555);
+            assert_eq!(budget.usage().work, 722_689);
         }
     }
     Ok(())

@@ -203,7 +203,7 @@ fn lc_root_coverage_refuses_missing_placement() -> TestResult {
 /// ´test:integration:stable-collection-bindings-generation-work-boundary´
 #[test]
 fn stable_collection_bindings_generation_work_boundary() -> TestResult {
-    let required = 823_148;
+    let required = 823_214;
     for short in [0, 1] {
         let (mut fixture, mut request) = original([1, 1], &mut ledger()?)?;
         request.limits.work = Some(required - short);

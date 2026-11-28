@@ -174,7 +174,7 @@ fn reciprocal_derivative_cumulative_pipeline_boundary() -> TestResult {
     let mut measured = Budget::new(policy())?;
     let costs = pipeline(&mut measured)?;
     let required = measured.usage().work;
-    assert_eq!((required, costs), (6_408_748, [6_153_592, 254_943, 213]));
+    assert_eq!((required, costs), (6_409_084, [6_153_928, 254_943, 213]));
     for work in [required, required - 1] {
         let mut budget = Budget::new(Limits { work, ..policy() })?;
         let result = pipeline(&mut budget);

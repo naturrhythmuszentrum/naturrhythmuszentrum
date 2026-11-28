@@ -25,6 +25,10 @@ fn ledger() -> TestResult<Budget> {
     Ok(Budget::new(Limits::blind_cubic())?)
 }
 
+// The one new policy entry adds 32 encoded bytes: four length, sixteen key,
+// four version and eight weight. Two policy validations add one Work each;
+// structural-key encoding and the interning floor each add 32 Work: 66 total.
+
 /// Checked transport equates the original strict determinant with an independently built exact coefficient.
 /// ´test:crate:lc-original-coefficient-equality-replays´
 #[test]
@@ -94,7 +98,7 @@ fn lc_original_missing_domain_refuses() -> TestResult {
     }
     assert_eq!(
         (domain_work, sign_work),
-        (9_874, vec![([0, 1], 458_432), ([1, 0], 456_020)])
+        (9_940, vec![([0, 1], 458_498), ([1, 0], 456_086)])
     );
     Ok(())
 }

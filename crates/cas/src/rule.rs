@@ -32,6 +32,8 @@ pub enum Primitive {
     CosEven,
     /// Oddness of arctangent on its original defined Real operand.
     AtanOdd,
+    /// Original common-argument circular identity and paired argument slopes.
+    TrigJoint,
     /// Premise-free structural definedness of the closed numeric fragment.
     DefinedTotal,
     /// Totality of closed Real trigonometric nodes from original definedness.
@@ -304,6 +306,7 @@ impl Primitive {
                 | Self::AtanOdd
                 | Self::DefinedTotal
                 | Self::TrigDefined
+                | Self::TrigJoint
                 | Self::HalfPiWitness
                 | Self::SinHalfPi
                 | Self::CosHalfPi
@@ -361,6 +364,7 @@ impl Primitive {
             Self::AtanOdd => ("trig.atan-odd", 2),
             Self::DefinedTotal => ("defined.total", 1),
             Self::TrigDefined => ("trig.defined", 2),
+            Self::TrigJoint => ("trig.pythagorean", 2),
             Self::HalfPiWitness => ("trig.half-pi-witness", 2),
             Self::SinHalfPi => ("trig.sin-half-pi", 2),
             Self::CosHalfPi => ("trig.cos-half-pi", 2),
@@ -552,6 +556,7 @@ impl Primitive {
             | Self::CosEven
             | Self::AtanOdd
             | Self::TrigDefined
+            | Self::TrigJoint
             | Self::SinHalfPi
             | Self::CosHalfPi
             | Self::Congruence
@@ -609,7 +614,7 @@ impl Primitive {
 }
 
 /// Every registered primitive, in ASCII key order; availability is separate metadata.
-pub const PRIMITIVES: [Primitive; 101] = [
+pub const PRIMITIVES: [Primitive; 102] = [
     Primitive::CaseCongruence,
     Primitive::CaseDomain,
     Primitive::CaseEliminate,
@@ -709,6 +714,7 @@ pub const PRIMITIVES: [Primitive; 101] = [
     Primitive::CosHalfPi,
     Primitive::TrigDefined,
     Primitive::HalfPiWitness,
+    Primitive::TrigJoint,
     Primitive::SinHalfPi,
     Primitive::SinOdd,
 ];

@@ -68,6 +68,7 @@ mod half_pi;
 mod half_pi_work;
 mod reading_memo;
 mod trig;
+mod trig_joint;
 mod trig_wire_work;
 mod trig_work;
 

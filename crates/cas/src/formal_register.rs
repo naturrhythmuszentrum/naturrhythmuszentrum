@@ -42,7 +42,7 @@ const fn named(
 /// Every native and solving primitive in the same ASCII key order as `PRIMITIVES`.
 ///
 /// Unavailable schemas remain represented assumptions and cannot certify an application.
-pub static PRIMITIVE_SCHEMAS: [PrimitiveSchema; 101] = [
+pub static PRIMITIVE_SCHEMAS: [PrimitiveSchema; 102] = [
     named(
         Primitive::CaseCongruence,
         "thm:cas:primitive-case-congruence",
@@ -638,6 +638,12 @@ pub static PRIMITIVE_SCHEMAS: [PrimitiveSchema; 101] = [
         "Ordered original definedness and checked equality in the identical context and domain, retaining every original divisor guard; canonical integer payload and exact repeated statement.",
     ),
     named(
+        Primitive::TrigJoint,
+        "thm:cas:primitive-trig-pythagorean",
+        "One original Real argument has an exact unit-coefficient sum of its sine and cosine squares equal to rational one on its original defined domain.",
+        "One ordered original `DomainGuard` on the exact source region; both closed nodes share its original operand and retain all conditions.",
+    ),
+    named(
         Primitive::SinHalfPi,
         "thm:cas:primitive-trig-sin-half-pi",
         "Sine of the original Real operand equals 0, 1, 0 or -1 at Euclidean integer residues 0, 1, 2 or 3 modulo four.",
@@ -676,8 +682,9 @@ impl Primitive {
             Self::CosHalfPi => &PRIMITIVE_SCHEMAS[96],
             Self::TrigDefined => &PRIMITIVE_SCHEMAS[97],
             Self::HalfPiWitness => &PRIMITIVE_SCHEMAS[98],
-            Self::SinHalfPi => &PRIMITIVE_SCHEMAS[99],
-            Self::SinOdd => &PRIMITIVE_SCHEMAS[100],
+            Self::TrigJoint => &PRIMITIVE_SCHEMAS[99],
+            Self::SinHalfPi => &PRIMITIVE_SCHEMAS[100],
+            Self::SinOdd => &PRIMITIVE_SCHEMAS[101],
             Self::Solve(schema) => solving(schema),
             Self::CaseCongruence => &PRIMITIVE_SCHEMAS[0],
             Self::CaseDomain => &PRIMITIVE_SCHEMAS[1],

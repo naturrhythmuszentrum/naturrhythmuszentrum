@@ -349,14 +349,7 @@ pub(crate) fn encode(
             domain,
             domain_contract,
         } => {
-            out.byte(0)?;
-            write(left, out)?;
-            write(right, out)?;
-            write(domain, out)?;
-            out.byte(match domain_contract {
-                crate::proof_model::DomainContract::DefinedAndEqual => 0,
-                crate::proof_model::DomainContract::SameDefinedDomain => 1,
-            })?;
+            encode_equality(left, right, domain, *domain_contract, out, &mut write)?;
         }
         Statement::PredicateFact { region, predicate } => {
             out.byte(1)?;
@@ -419,6 +412,26 @@ pub(crate) fn encode(
         }
         _ => return encode_values(value, out, write),
     }
+    Ok(())
+}
+
+/// Encode one equality and its explicit domain contract.
+fn encode_equality(
+    left: &Handle,
+    right: &Handle,
+    domain: &Handle,
+    domain_contract: crate::proof_model::DomainContract,
+    out: &mut Encoder<'_>,
+    write: &mut impl FnMut(&Handle, &mut Encoder<'_>) -> Result<(), Fault>,
+) -> Result<(), Fault> {
+    out.byte(0)?;
+    write(left, out)?;
+    write(right, out)?;
+    write(domain, out)?;
+    out.byte(match domain_contract {
+        crate::proof_model::DomainContract::DefinedAndEqual => 0,
+        crate::proof_model::DomainContract::SameDefinedDomain => 1,
+    })?;
     Ok(())
 }
 
